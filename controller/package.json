@@ -1,0 +1,15 @@
+{
+  "name": "kodu-sandbox-controller",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Kodu Sandbox — M1: кодоор контейнер асааж preview харуулах",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "dockerode": "^4.0.2",
+    "express": "^4.19.2"
+  }
+}

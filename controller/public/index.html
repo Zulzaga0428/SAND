@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="mn">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Kodu Sandbox — Preview Controller</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+        background: #0b1020;
+        color: #e6e9f2;
+        line-height: 1.5;
+      }
+      .wrap { max-width: 760px; margin: 0 auto; padding: 32px 20px 64px; }
+      h1 { font-size: 22px; margin: 0 0 4px; }
+      .sub { color: #8b93a7; font-size: 14px; margin: 0 0 24px; }
+      label { display: block; font-size: 13px; color: #a7b0c4; margin: 0 0 6px; }
+      textarea {
+        width: 100%;
+        min-height: 120px;
+        background: #131a2e;
+        color: #e6e9f2;
+        border: 1px solid #26304c;
+        border-radius: 10px;
+        padding: 12px;
+        font-family: ui-monospace, "Cascadia Code", Menlo, monospace;
+        font-size: 13px;
+        resize: vertical;
+      }
+      button {
+        cursor: pointer;
+        border: none;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 600;
+        padding: 10px 16px;
+      }
+      .primary { background: #6d5efc; color: #fff; margin-top: 12px; }
+      .primary:disabled { opacity: 0.5; cursor: default; }
+      .stop { background: #3a1220; color: #ff8fa3; padding: 6px 12px; font-size: 13px; }
+      .list { margin-top: 32px; }
+      .list h2 { font-size: 15px; color: #a7b0c4; }
+      .card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        background: #131a2e;
+        border: 1px solid #26304c;
+        border-radius: 10px;
+        padding: 12px 14px;
+        margin-bottom: 10px;
+      }
+      .card a { color: #8fb0ff; text-decoration: none; font-weight: 600; }
+      .card .id { color: #66708a; font-size: 12px; font-family: ui-monospace, monospace; }
+      .empty { color: #66708a; font-size: 14px; }
+      .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #35d07f; margin-right: 6px; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>🐳 Kodu Sandbox — Preview Controller</h1>
+      <p class="sub">
+        Доор HTML бич → "Preview үүсгэх" дар. Код нь ДОКЕР КОНТЕЙНЕР асааж,
+        тэр контейнерээс чиний хуудсыг үзүүлнэ. Яг KoDu-гийн preview шиг.
+      </p>
+
+      <label for="html">Вэб хуудасны HTML (хоосон орхивол жишээ гарна)</label>
+      <textarea id="html" placeholder="&lt;h1&gt;Миний сайт&lt;/h1&gt;&#10;&lt;p&gt;Kodu Sandbox дээр ажиллаж байна!&lt;/p&gt;"></textarea>
+      <button class="primary" id="create">Preview үүсгэх 🚀</button>
+
+      <div class="list">
+        <h2>Ажиллаж буй preview-ууд</h2>
+        <div id="items"><p class="empty">Ачааллаж байна…</p></div>
+      </div>
+    </div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+
+      async function refresh() {
+        const res = await fetch("/api/previews");
+        const items = await res.json();
+        const box = $("items");
+        if (!items.length) {
+          box.innerHTML = '<p class="empty">Одоогоор идэвхтэй preview алга.</p>';
+          return;
+        }
+        box.innerHTML = items
+          .map(
+            (it) => `
+          <div class="card">
+            <div>
+              <div><span class="dot"></span><a href="${it.url}" target="_blank">${it.url}</a></div>
+              <div class="id">${it.id.slice(0, 12)}</div>
+            </div>
+            <button class="stop" onclick="stop('${it.id}')">Зогсоох</button>
+          </div>`
+          )
+          .join("");
+      }
+
+      async function stop(id) {
+        await fetch("/api/previews/" + id, { method: "DELETE" });
+        refresh();
+      }
+
+      $("create").onclick = async () => {
+        const btn = $("create");
+        btn.disabled = true;
+        btn.textContent = "Контейнер асааж байна…";
+        try {
+          const res = await fetch("/api/previews", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ html: $("html").value }),
+          });
+          const data = await res.json();
+          if (data.url) {
+            window.open(data.url, "_blank");
+          } else {
+            alert("Алдаа: " + (data.error || "тодорхойгүй"));
+          }
+        } catch (e) {
+          alert("Алдаа: " + e.message);
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "Preview үүсгэх 🚀";
+          refresh();
+        }
+      };
+
+      refresh();
+      setInterval(refresh, 4000); // 4 сек тутам жагсаалт шинэчилнэ
+    </script>
+  </body>
+</html>
