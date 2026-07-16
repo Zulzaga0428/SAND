@@ -6,17 +6,19 @@ const path = require("path");
 const { createPreview, listPreviews, stopPreview } = require("./sandbox");
 
 const app = express();
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: "5mb" }));
 
 // Хяналтын самбар (нүүр хуудас)
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// Шинэ preview үүсгэх
+// Шинэ preview үүсгэх.
+// M2: { files: [{path, content}, ...] } хүлээж авна.
+// M1-тэй нийцтэй: { html: "..." } өгвөл ганц index.html гэж үзнэ.
 app.post("/api/previews", async (req, res) => {
   try {
-    const result = await createPreview(req.body.html);
+    const result = await createPreview(req.body.files || req.body.html);
     res.json(result);
   } catch (e) {
     console.error("createPreview алдаа:", e.message);

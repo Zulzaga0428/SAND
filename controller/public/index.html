@@ -13,33 +13,96 @@
         color: #e6e9f2;
         line-height: 1.5;
       }
-      .wrap { max-width: 760px; margin: 0 auto; padding: 32px 20px 64px; }
+      .wrap { max-width: 860px; margin: 0 auto; padding: 32px 20px 64px; }
       h1 { font-size: 22px; margin: 0 0 4px; }
       .sub { color: #8b93a7; font-size: 14px; margin: 0 0 24px; }
-      label { display: block; font-size: 13px; color: #a7b0c4; margin: 0 0 6px; }
+
+      /* Файлын editor */
+      .editor {
+        border: 1px solid #26304c;
+        border-radius: 12px;
+        overflow: hidden;
+        background: #131a2e;
+      }
+      .tabs {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px;
+        padding: 8px 8px 0;
+        background: #0f1526;
+        border-bottom: 1px solid #26304c;
+      }
+      .tab {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        font-size: 13px;
+        font-family: ui-monospace, "Cascadia Code", Menlo, monospace;
+        color: #a7b0c4;
+        background: transparent;
+        border: 1px solid transparent;
+        border-radius: 8px 8px 0 0;
+        cursor: pointer;
+      }
+      .tab.active {
+        color: #fff;
+        background: #131a2e;
+        border-color: #26304c;
+        border-bottom-color: #131a2e;
+        margin-bottom: -1px;
+      }
+      .tab .x {
+        color: #66708a;
+        font-size: 12px;
+        padding: 0 2px;
+        border-radius: 4px;
+      }
+      .tab .x:hover { color: #ff8fa3; background: #3a1220; }
+      .addtab {
+        border: none;
+        background: transparent;
+        color: #6d5efc;
+        font-size: 18px;
+        cursor: pointer;
+        padding: 4px 10px;
+      }
       textarea {
+        display: block;
         width: 100%;
-        min-height: 120px;
+        min-height: 260px;
         background: #131a2e;
         color: #e6e9f2;
-        border: 1px solid #26304c;
-        border-radius: 10px;
-        padding: 12px;
+        border: none;
+        outline: none;
+        padding: 14px;
         font-family: ui-monospace, "Cascadia Code", Menlo, monospace;
         font-size: 13px;
         resize: vertical;
       }
-      button {
+
+      button.primary {
         cursor: pointer;
         border: none;
         border-radius: 10px;
         font-size: 14px;
         font-weight: 600;
         padding: 10px 16px;
+        background: #6d5efc;
+        color: #fff;
+        margin-top: 14px;
       }
-      .primary { background: #6d5efc; color: #fff; margin-top: 12px; }
-      .primary:disabled { opacity: 0.5; cursor: default; }
-      .stop { background: #3a1220; color: #ff8fa3; padding: 6px 12px; font-size: 13px; }
+      button.primary:disabled { opacity: 0.5; cursor: default; }
+      .stop {
+        cursor: pointer;
+        border: none;
+        border-radius: 10px;
+        background: #3a1220;
+        color: #ff8fa3;
+        padding: 6px 12px;
+        font-size: 13px;
+      }
       .list { margin-top: 32px; }
       .list h2 { font-size: 15px; color: #a7b0c4; }
       .card {
@@ -63,12 +126,14 @@
     <div class="wrap">
       <h1>🐳 Kodu Sandbox — Preview Controller</h1>
       <p class="sub">
-        Доор HTML бич → "Preview үүсгэх" дар. Код нь ДОКЕР КОНТЕЙНЕР асааж,
-        тэр контейнерээс чиний хуудсыг үзүүлнэ. Яг KoDu-гийн preview шиг.
+        M2: Олон файлтай төслөө бич → "Preview үүсгэх" дар. Код нь файлуудыг чинь
+        ДОКЕР КОНТЕЙНЕР дотор бичиж, тэндээс сайтыг чинь үзүүлнэ. Яг KoDu-гийн preview шиг.
       </p>
 
-      <label for="html">Вэб хуудасны HTML (хоосон орхивол жишээ гарна)</label>
-      <textarea id="html" placeholder="&lt;h1&gt;Миний сайт&lt;/h1&gt;&#10;&lt;p&gt;Kodu Sandbox дээр ажиллаж байна!&lt;/p&gt;"></textarea>
+      <div class="editor">
+        <div class="tabs" id="tabs"></div>
+        <textarea id="content" spellcheck="false"></textarea>
+      </div>
       <button class="primary" id="create">Preview үүсгэх 🚀</button>
 
       <div class="list">
@@ -80,6 +145,84 @@
     <script>
       const $ = (id) => document.getElementById(id);
 
+      // ── Файлын төлөв ─────────────────────────────────────────────
+      // Эхлээд 3 файлтай жишээ төсөл өгнө — олон файл ажилладагийг шууд харуулна.
+      let files = [
+        {
+          path: "index.html",
+          content:
+            "<!doctype html>\n<html lang=\"mn\">\n<head>\n  <meta charset=\"utf-8\">\n  <title>Миний төсөл</title>\n  <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n  <h1>Сайн уу! 🐳</h1>\n  <p>Энэ сайт <b>3 файлтай</b>: HTML + CSS + JS — бүгд контейнер дотор.</p>\n  <button id=\"btn\">Намайг дар!</button>\n  <p id=\"out\"></p>\n  <script src=\"script.js\"><\/script>\n</body>\n</html>",
+        },
+        {
+          path: "style.css",
+          content:
+            "body {\n  font-family: system-ui, sans-serif;\n  background: #0b1020;\n  color: #e6e9f2;\n  max-width: 600px;\n  margin: 60px auto;\n  padding: 0 20px;\n}\nh1 { color: #8fb0ff; }\nbutton {\n  background: #6d5efc;\n  color: #fff;\n  border: none;\n  border-radius: 8px;\n  padding: 10px 18px;\n  font-size: 15px;\n  cursor: pointer;\n}",
+        },
+        {
+          path: "script.js",
+          content:
+            'let n = 0;\ndocument.getElementById("btn").onclick = () => {\n  n++;\n  document.getElementById("out").textContent =\n    `Чи ${n} удаа дарлаа — JS ч бас контейнер дотроос ажиллаж байна! 🎉`;\n};',
+        },
+      ];
+      let active = 0;
+
+      function renderTabs() {
+        const tabs = $("tabs");
+        tabs.innerHTML = "";
+        files.forEach((f, i) => {
+          const tab = document.createElement("div");
+          tab.className = "tab" + (i === active ? " active" : "");
+          const name = document.createElement("span");
+          name.textContent = f.path;
+          tab.appendChild(name);
+          if (files.length > 1) {
+            const x = document.createElement("span");
+            x.className = "x";
+            x.textContent = "✕";
+            x.title = "Файл устгах";
+            x.onclick = (e) => {
+              e.stopPropagation();
+              if (!confirm(f.path + " файлыг устгах уу?")) return;
+              files.splice(i, 1);
+              if (active >= files.length) active = files.length - 1;
+              renderTabs();
+              renderContent();
+            };
+            tab.appendChild(x);
+          }
+          tab.onclick = () => {
+            saveContent();
+            active = i;
+            renderTabs();
+            renderContent();
+          };
+          tabs.appendChild(tab);
+        });
+        const add = document.createElement("button");
+        add.className = "addtab";
+        add.textContent = "+";
+        add.title = "Шинэ файл нэмэх";
+        add.onclick = () => {
+          const name = prompt("Файлын нэр (жишээ: about.html, extra.css):");
+          if (!name || !name.trim()) return;
+          saveContent();
+          files.push({ path: name.trim(), content: "" });
+          active = files.length - 1;
+          renderTabs();
+          renderContent();
+        };
+        tabs.appendChild(add);
+      }
+
+      function renderContent() {
+        $("content").value = files[active] ? files[active].content : "";
+      }
+      function saveContent() {
+        if (files[active]) files[active].content = $("content").value;
+      }
+      $("content").addEventListener("input", saveContent);
+
+      // ── Preview-уудын жагсаалт ──────────────────────────────────
       async function refresh() {
         const res = await fetch("/api/previews");
         const items = await res.json();
@@ -108,6 +251,7 @@
       }
 
       $("create").onclick = async () => {
+        saveContent();
         const btn = $("create");
         btn.disabled = true;
         btn.textContent = "Контейнер асааж байна…";
@@ -115,7 +259,7 @@
           const res = await fetch("/api/previews", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ html: $("html").value }),
+            body: JSON.stringify({ files }),
           });
           const data = await res.json();
           if (data.url) {
@@ -132,6 +276,8 @@
         }
       };
 
+      renderTabs();
+      renderContent();
       refresh();
       setInterval(refresh, 4000); // 4 сек тутам жагсаалт шинэчилнэ
     </script>

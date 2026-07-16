@@ -1,8 +1,13 @@
-// sandbox.js — Kodu Sandbox-ийн ЦӨМ
-// Docker-ыг кодоор удирдана: контейнер асаа → preview URL буцаа → TTL дараа устга.
-// Яг л E2B хийдэг ажил, гэхдээ ӨӨРИЙН код дээр.
+// sandbox.js — Kodu Sandbox-ийн ЦӨМ (M2)
+// Docker-ыг кодоор удирдана: контейнер асаа → ТӨСЛИЙН ФАЙЛУУДЫГ дотор нь бич →
+// preview URL буцаа → TTL дараа устга. Яг л E2B хийдэг ажил, гэхдээ ӨӨРИЙН код дээр.
+//
+// M1: ганц HTML-ийг env хувьсагчаар дамжуулдаг байсан (жижиг заль).
+// M2: ОЛОН ФАЙЛЫГ tar архив болгож контейнер руу шууд бичнэ (putArchive) —
+//     энэ бол жинхэнэ sandbox-уудын ашигладаг арга.
 
 const Docker = require("dockerode");
+const tar = require("tar-stream");
 
 // Docker Desktop-той холбогдоно.
 // Windows дээр named pipe, Mac/Linux дээр socket ашиглана.
@@ -33,27 +38,78 @@ async function ensureImage() {
   });
 }
 
+// Контейнер дотор ажиллах жижиг static сервер.
+// /app доторх файлуудыг зөв Content-Type-тэйгээр үзүүлнэ.
+const SERVER_SCRIPT =
+  'const http=require("http"),fs=require("fs"),path=require("path");' +
+  'const root="/app";' +
+  "const mime={" +
+  '".html":"text/html",".css":"text/css",".js":"text/javascript",' +
+  '".json":"application/json",".svg":"image/svg+xml",".txt":"text/plain"' +
+  "};" +
+  "http.createServer((req,res)=>{" +
+  'let p=decodeURIComponent(req.url.split("?")[0]);' +
+  'if(p.endsWith("/"))p+="index.html";' +
+  "const f=path.normalize(path.join(root,p));" +
+  "if(!f.startsWith(root)){res.statusCode=403;return res.end('forbidden');}" +
+  "fs.readFile(f,(e,d)=>{" +
+  "if(e){res.statusCode=404;return res.end('not found');}" +
+  "const ext=path.extname(f).toLowerCase();" +
+  'res.setHeader("Content-Type",(mime[ext]||"application/octet-stream")+' +
+  '(mime[ext]?"; charset=utf-8":""));' +
+  "res.end(d);});" +
+  '}).listen(3000,()=>console.log("preview up"));';
+
+// Хэрэглэгчийн өгсөн файлын замыг цэвэрлэнэ (аюулгүй байдал):
+// эхний "/"-үүдийг хасна, ".."-тэй замыг хориглоно.
+function sanitizePath(p) {
+  const clean = String(p || "").replace(/\\/g, "/").replace(/^\/+/, "");
+  if (!clean || clean.split("/").includes("..")) {
+    throw new Error(`Буруу файлын зам: ${p}`);
+  }
+  return clean;
+}
+
+// files = [{ path: "index.html", content: "..." }, ...] массивыг
+// tar архив (Buffer) болгоно. Бүх файл app/ фолдер дор орно.
+function filesToTar(files) {
+  return new Promise((resolve, reject) => {
+    const pack = tar.pack();
+    const chunks = [];
+    pack.on("data", (c) => chunks.push(c));
+    pack.on("end", () => resolve(Buffer.concat(chunks)));
+    pack.on("error", reject);
+
+    // /app фолдерыг бүх хэрэглэгч уншиж чадахаар үүсгэнэ
+    pack.entry({ name: "app/", type: "directory", mode: 0o755 });
+    for (const f of files) {
+      pack.entry(
+        { name: "app/" + sanitizePath(f.path), mode: 0o644 },
+        String(f.content ?? "")
+      );
+    }
+    pack.finalize();
+  });
+}
+
 // Нэг preview контейнер асаана.
-// html = хэрэглэгчийн үзүүлэх вэб хуудасны агуулга.
-async function createPreview(html) {
+// files = төслийн файлууд [{path, content}].
+// (Хуучин хэлбэр: string өгвөл ганц index.html гэж үзнэ — M1-тэй нийцтэй.)
+async function createPreview(files) {
   await ensureImage();
 
-  const safeHtml =
-    html && html.trim() ? html : "<h1>Сайн уу, Kodu Sandbox! 🐳</h1>";
-
-  // Контейнер дотор ажиллах жижиг вэб сервер.
-  // Өгсөн HTML-ийг орчны хувьсагчаар дамжуулж, порт 3000 дээр үзүүлнэ.
-  const script =
-    'const http=require("http");' +
-    "http.createServer((q,r)=>{" +
-    'r.setHeader("Content-Type","text/html; charset=utf-8");' +
-    "r.end(process.env.KODU_HTML);" +
-    '}).listen(3000,()=>console.log("preview up"));';
+  if (typeof files === "string") {
+    files = [{ path: "index.html", content: files }];
+  }
+  if (!Array.isArray(files) || !files.length) {
+    files = [
+      { path: "index.html", content: "<h1>Сайн уу, Kodu Sandbox! 🐳</h1>" },
+    ];
+  }
 
   const container = await docker.createContainer({
     Image: IMAGE,
-    Cmd: ["node", "-e", script],
-    Env: [`KODU_HTML=${safeHtml}`],
+    Cmd: ["node", "-e", SERVER_SCRIPT],
     User: "node", // 🔒 дүрэм #3: root биш хэрэглэгчээр ажиллана
     ExposedPorts: { [INTERNAL_PORT]: {} },
     HostConfig: {
@@ -66,6 +122,11 @@ async function createPreview(html) {
     },
     Labels: { "kodu.sandbox": "preview" }, // өөрсдийн контейнераа таних тэмдэг
   });
+
+  // M2-ийн ГОЛ АЛХАМ: файлуудыг tar болгоод контейнерийн / дээр задална
+  // (app/ prefix-тэй тул /app дотор бичигдэнэ). Асаахаас ӨМНӨ хийнэ.
+  const archive = await filesToTar(files);
+  await container.putArchive(archive, { path: "/" });
 
   await container.start();
 

@@ -2,7 +2,7 @@
   "name": "kodu-sandbox-controller",
   "version": "0.1.0",
   "private": true,
-  "description": "Kodu Sandbox — M1: кодоор контейнер асааж preview харуулах",
+  "description": "Kodu Sandbox — M2: олон файлтай төслийг контейнер дотор preview хийх",
   "type": "commonjs",
   "scripts": {
     "dev": "node server.js",
@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "dockerode": "^4.0.2",
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "tar-stream": "^3.1.7"
   }
 }
