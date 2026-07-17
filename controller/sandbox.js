@@ -61,6 +61,29 @@ const SERVER_SCRIPT =
   "res.end(d);});" +
   '}).listen(3000,()=>console.log("preview up"));';
 
+// 🔒 Оролтын хязгаарууд — API-г тусдаа үйлчилгээ болгох тул
+// хэт том/олон файлаар серверийг дарахаас хамгаална.
+const MAX_FILES = 50;
+const MAX_FILE_BYTES = 512 * 1024; // файл бүр ≤ 512KB
+const MAX_TOTAL_BYTES = 2 * 1024 * 1024; // нийт ≤ 2MB
+
+function validateFiles(files) {
+  if (files.length > MAX_FILES) {
+    throw new Error(`Хэт олон файл: ${files.length} (дээд тал нь ${MAX_FILES})`);
+  }
+  let total = 0;
+  for (const f of files) {
+    const size = Buffer.byteLength(String(f.content ?? ""));
+    if (size > MAX_FILE_BYTES) {
+      throw new Error(`'${f.path}' хэт том (${size} байт, дээд тал нь ${MAX_FILE_BYTES})`);
+    }
+    total += size;
+  }
+  if (total > MAX_TOTAL_BYTES) {
+    throw new Error(`Нийт хэмжээ хэт том (${total} байт, дээд тал нь ${MAX_TOTAL_BYTES})`);
+  }
+}
+
 // Хэрэглэгчийн өгсөн файлын замыг цэвэрлэнэ (аюулгүй байдал):
 // эхний "/"-үүдийг хасна, ".."-тэй замыг хориглоно.
 function sanitizePath(p) {
@@ -144,6 +167,7 @@ async function createPreview(files, mode = "static") {
       ? []
       : [{ path: "index.html", content: "<h1>Сайн уу, Kodu Sandbox! 🐳</h1>" }];
   }
+  validateFiles(files);
 
   const container = await docker.createContainer({
     Image: isApp ? IMAGE_APP : IMAGE,

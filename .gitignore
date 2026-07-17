@@ -16,6 +16,7 @@ build/
 !.env.example
 *.pem
 *.key
+.kodu-key
 
 # OS / editor
 .DS_Store

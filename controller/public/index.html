@@ -164,6 +164,37 @@
     <script>
       const $ = (id) => document.getElementById(id);
 
+      // ── API түлхүүр ──────────────────────────────────────────────
+      // Controller-ийн терминалд хэвлэгдсэн түлхүүрийг нэг удаа асуугаад
+      // browser-ийн localStorage-д санана. 401 ирвэл дахин асууна.
+      function getKey(forceAsk) {
+        let key = localStorage.getItem("kodu-key") || "";
+        if (!key || forceAsk) {
+          key = prompt(
+            "API түлхүүр оруулна уу (controller асаахад терминалд 🔑 гэж хэвлэгддэг):",
+            key
+          ) || "";
+          localStorage.setItem("kodu-key", key.trim());
+        }
+        return localStorage.getItem("kodu-key") || "";
+      }
+
+      // Түлхүүртэй fetch — 401 ирвэл түлхүүрээ дахин асуугаад НЭГ удаа давтана
+      async function api(url, options = {}, retried = false) {
+        const res = await fetch(url, {
+          ...options,
+          headers: {
+            ...(options.headers || {}),
+            Authorization: "Bearer " + getKey(false),
+          },
+        });
+        if (res.status === 401 && !retried) {
+          getKey(true);
+          return api(url, options, true);
+        }
+        return res;
+      }
+
       // ── Горим ба файлын төлөв ────────────────────────────────────
       // static: HTML/CSS/JS (жижиг static сервер)
       // app:    Next.js (node_modules бэлэн template image дээр)
@@ -270,7 +301,8 @@
 
       // ── Preview-уудын жагсаалт ──────────────────────────────────
       async function refresh() {
-        const res = await fetch("/api/previews");
+        const res = await api("/api/previews");
+        if (!res.ok) return;
         const items = await res.json();
         const box = $("items");
         if (!items.length) {
@@ -292,7 +324,7 @@
       }
 
       async function stop(id) {
-        await fetch("/api/previews/" + id, { method: "DELETE" });
+        await api("/api/previews/" + id, { method: "DELETE" });
         refresh();
       }
 
@@ -305,7 +337,7 @@
             ? "Next.js асааж байна… (10–60 сек)"
             : "Контейнер асааж байна…";
         try {
-          const res = await fetch("/api/previews", {
+          const res = await api("/api/previews", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ files, mode }),
