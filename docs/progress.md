@@ -83,6 +83,18 @@
 
 ---
 
+## ✅ Өдөр 2 (үргэлжлэл) — Landing сайт Railway дээр АМЬД (2026-07-17)
+
+- ✅ `landing/` — Kodu Sandbox танилцуулга сайт (express + static, DB/Docker хэрэггүй)
+- ✅ Railway дээр deploy хийсэн (Root Directory = `landing` тохиргоо чухал байсан!)
+- 🌍 **Амьд линк:** https://sand-production.up.railway.app/
+- ✅ Бүх хэсэг зөв гарч байгааг шалгасан (hero, боломжууд, алхмууд, замын зураг)
+- 💡 Домэйний шийдвэр: одоохондоо Railway subdomain хангалттай.
+  Жинхэнэ домэйн (жишээ: kodusandbox.mn)-ийг **VPS авахтай зэрэг** авна —
+  учир нь wildcard preview URL (`*.p.домэйн`) тэр үед л хэрэгтэй болно.
+
+---
+
 ## ⬜ Дараа юунаас үргэлжлүүлэх вэ — M3
 
 - Цэвэр Preview URL routing (санамсаргүй порт биш) — VPS/домэйнтэй үед
