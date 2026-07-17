@@ -37,14 +37,42 @@ function keysEqual(a, b) {
 }
 
 const app = express();
+app.set("trust proxy", 1); // reverse proxy (Caddy) ард байвал жинхэнэ IP-г уншина
 app.use(express.json({ limit: "5mb" }));
+
+// 🔒 Энгийн rate limit — IP тус бүр цонхонд N хүсэлт. Санах ойд, гуравдагч
+// сан хэрэггүй. Хортой хэн нэг олон хүсэлтээр серверийг дарахаас хамгаална.
+const RATE_WINDOW_MS = 60_000; // 1 минут
+const RATE_MAX = parseInt(process.env.RATE_MAX || "30", 10); // IP-д минутад 30 хүсэлт
+const hits = new Map(); // ip -> [timestamps]
+function rateLimit(req, res, next) {
+  const ip = req.ip || "unknown";
+  const now = Date.now();
+  const arr = (hits.get(ip) || []).filter((t) => now - t < RATE_WINDOW_MS);
+  arr.push(now);
+  hits.set(ip, arr);
+  if (arr.length > RATE_MAX) {
+    return res.status(429).json({ error: "Хэт олон хүсэлт. Түр хүлээгээд дахин оролдоно уу." });
+  }
+  next();
+}
+// Санах ой хуримтлагдахаас сэргийлж хуучин бүртгэлийг цэвэрлэнэ
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, arr] of hits) {
+    const keep = arr.filter((t) => now - t < RATE_WINDOW_MS);
+    if (keep.length) hits.set(ip, keep);
+    else hits.delete(ip);
+  }
+}, RATE_WINDOW_MS).unref();
 
 // Хяналтын самбар (нүүр хуудас) — түлхүүр шаардахгүй, харин API нь шаардана
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// 🔒 /api/* бүх зам түлхүүр шаардана: Authorization: Bearer <түлхүүр>
+// 🔒 /api/* бүх зам эхлээд rate limit, дараа нь түлхүүр шаардана
+app.use("/api", rateLimit);
 app.use("/api", (req, res, next) => {
   const auth = req.headers.authorization || "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";

@@ -185,10 +185,16 @@ function hostConfig(isApp) {
     // 🔒 дүрэм #4: нөөцийн хязгаар. Next.js dev server илүү их RAM иддэг.
     // CPU нь серверийн бодит цөмийн тооноос хэтрэхгүй (VPS ихэвчлэн 1 vCPU).
     Memory: (isApp ? 1024 : 512) * 1024 * 1024,
+    MemorySwap: (isApp ? 1024 : 512) * 1024 * 1024, // swap нэмэхгүй (RAM=нийт хязгаар)
     NanoCpus: Math.round((isApp ? CPUS_APP : CPUS_STATIC) * 1_000_000_000),
     PidsLimit: 256,
     AutoRemove: true, // 🔒 дүрэм #2: зогсмогц устана (ephemeral)
     NetworkMode: NETWORK, // 🔒 тусгаарлагдсан сүлжээ (контейнер хооронд icc=false)
+    // 🔒 Linux capability-г БҮГДИЙГ хасна — контейнер доторх код систем
+    // түвшний ямар ч тусгай эрхгүй (raw socket, mount, module ачаалах г.м бүгд хаалттай).
+    CapDrop: ["ALL"],
+    // 🔒 setuid/setgid-ээр эрх нэмэгдүүлэхийг хориглоно (privilege escalation хаах)
+    SecurityOpt: ["no-new-privileges"],
   };
 }
 
