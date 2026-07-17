@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="mn">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Kodu Sandbox — Монгол preview sandbox үйлчилгээ</title>
+    <meta
+      name="description"
+      content="Kodu Sandbox — кодыг тусгаарлагдсан контейнерт аюулгүй ажиллуулж, секундын дотор live preview үзүүлдэг Монголын анхны sandbox үйлчилгээ."
+    />
+    <style>
+      * { box-sizing: border-box; margin: 0; }
+      :root {
+        --bg: #0b1020;
+        --panel: #131a2e;
+        --line: #26304c;
+        --text: #e6e9f2;
+        --muted: #8b93a7;
+        --accent: #6d5efc;
+        --accent2: #8fb0ff;
+        --green: #35d07f;
+      }
+      body {
+        font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.6;
+      }
+      .wrap { max-width: 880px; margin: 0 auto; padding: 0 20px; }
+
+      /* Nav */
+      nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 20px 0;
+      }
+      .logo { font-weight: 800; font-size: 18px; }
+      .logo .du { color: var(--accent); }
+      .badge {
+        font-size: 12px;
+        color: var(--muted);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 4px 12px;
+      }
+
+      /* Hero */
+      .hero { padding: 72px 0 56px; text-align: center; }
+      .hero .tag {
+        display: inline-block;
+        font-size: 13px;
+        color: var(--accent2);
+        border: 1px solid var(--line);
+        background: var(--panel);
+        border-radius: 999px;
+        padding: 6px 14px;
+        margin-bottom: 24px;
+      }
+      h1 { font-size: clamp(32px, 6vw, 52px); line-height: 1.15; font-weight: 800; }
+      h1 .grad {
+        background: linear-gradient(90deg, var(--accent), var(--accent2));
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      .hero p.sub {
+        color: var(--muted);
+        font-size: 17px;
+        max-width: 560px;
+        margin: 20px auto 0;
+      }
+
+      /* Diagram */
+      .diagram {
+        margin: 48px auto 0;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 24px;
+        font-family: ui-monospace, "Cascadia Code", Menlo, monospace;
+        font-size: 14px;
+        color: var(--accent2);
+        overflow-x: auto;
+        white-space: nowrap;
+      }
+      .diagram .dim { color: var(--muted); }
+
+      /* Sections */
+      section { padding: 56px 0; border-top: 1px solid var(--line); }
+      h2 { font-size: 26px; margin-bottom: 8px; }
+      .lead { color: var(--muted); margin-bottom: 32px; }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 16px;
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 22px;
+      }
+      .card .icon { font-size: 26px; margin-bottom: 10px; }
+      .card h3 { font-size: 16px; margin-bottom: 6px; }
+      .card p { color: var(--muted); font-size: 14px; }
+
+      /* Steps */
+      .steps { counter-reset: step; display: grid; gap: 14px; }
+      .step {
+        display: flex;
+        gap: 16px;
+        align-items: flex-start;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 18px 20px;
+      }
+      .step .n {
+        flex: none;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--accent);
+        color: #fff;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .step p { color: var(--muted); font-size: 14px; }
+      .step b { color: var(--text); }
+
+      code.inline {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 2px 8px;
+        font-size: 13px;
+        color: var(--accent2);
+        font-family: ui-monospace, "Cascadia Code", Menlo, monospace;
+      }
+
+      /* Status */
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        color: var(--muted);
+      }
+      .dot {
+        width: 9px; height: 9px; border-radius: 50%;
+        background: var(--green);
+        box-shadow: 0 0 8px var(--green);
+      }
+
+      footer {
+        border-top: 1px solid var(--line);
+        padding: 32px 0 48px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+        justify-content: space-between;
+        color: var(--muted);
+        font-size: 14px;
+      }
+      footer a { color: var(--accent2); text-decoration: none; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <nav>
+        <div class="logo">🐳 Kodu <span class="du">Sandbox</span></div>
+        <div class="badge">v0.1 — идэвхтэй хөгжүүлэлтэд</div>
+      </nav>
+
+      <div class="hero">
+        <span class="tag">Монголын анхны preview sandbox үйлчилгээ</span>
+        <h1>Кодыг аюулгүй ажиллуулж,<br /><span class="grad">секундэд preview</span> үзүүлнэ</h1>
+        <p class="sub">
+          Kodu Sandbox нь код бүрийг тусгаарлагдсан Docker контейнерт ажиллуулж,
+          live preview URL буцаадаг API үйлчилгээ. AI вэб бүтээгчдийн ард ажилладаг
+          "гал тогоо" — одоо өөрсдийн гар дээр.
+        </p>
+        <div class="diagram">
+          Таны апп <span class="dim">→</span> Kodu Sandbox API <span class="dim">→</span> 🐳 контейнер <span class="dim">→</span> ⚡ Preview URL <span class="dim">→ 15 мин дараа өөрөө устана</span>
+        </div>
+      </div>
+
+      <section>
+        <h2>Боломжууд</h2>
+        <p class="lead">Жижиг, тодорхой, аюулгүй — нэг ажлыг сайн хийнэ.</p>
+        <div class="grid">
+          <div class="card">
+            <div class="icon">🧊</div>
+            <h3>Түр зуурын контейнер</h3>
+            <p>Preview бүр өөрийн тусгаарлагдсан контейнерт. Ажил дуусмагц ор мөргүй устана — үлдэгдэл, хог байхгүй.</p>
+          </div>
+          <div class="card">
+            <div class="icon">⚛️</div>
+            <h3>Next.js template</h3>
+            <p>node_modules урьдчилан суулгасан image — npm install огт хийхгүй, React апп секундэд асна.</p>
+          </div>
+          <div class="card">
+            <div class="icon">🔑</div>
+            <h3>API түлхүүр</h3>
+            <p>Бүх хүсэлт Bearer түлхүүрээр хамгаалагдсан. Оролтын хатуу хязгаар: файлын тоо, хэмжээ шалгагдана.</p>
+          </div>
+          <div class="card">
+            <div class="icon">🔒</div>
+            <h3>Нөөцийн хязгаар</h3>
+            <p>Контейнер бүр RAM/CPU/process хязгаартай, root биш хэрэглэгчээр ажиллана. Нэг нь нөгөөд халдахгүй.</p>
+          </div>
+          <div class="card">
+            <div class="icon">📁</div>
+            <h3>Олон файлтай төсөл</h3>
+            <p>HTML/CSS/JS-ээс эхлээд бүтэн Next.js төсөл хүртэл — файлуудыг tar-аар контейнерт шууд бичнэ.</p>
+          </div>
+          <div class="card">
+            <div class="icon">🇲🇳</div>
+            <h3>Монголд, монголоор</h3>
+            <p>Монголын AI вэб бүтээгч KoDu-гийн preview-г тэжээх зорилготой төрсөн. Баримт бичиг бүгд монголоор.</p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Хэрхэн ажилладаг вэ</h2>
+        <p class="lead">Гурван алхам — API дуудахад бүгд автоматаар болно.</p>
+        <div class="steps">
+          <div class="step">
+            <div class="n">1</div>
+            <p><b>Файлуудаа илгээ.</b> <code class="inline">POST /api/previews</code> руу төслийн файлууд + горимоо (static / Next.js) явуулна.</p>
+          </div>
+          <div class="step">
+            <div class="n">2</div>
+            <p><b>Sandbox контейнер асаана.</b> Файлууд tar-аар контейнерт бичигдэж, сервер ажиллаж эхэлмэгц бэлэн болно.</p>
+          </div>
+          <div class="step">
+            <div class="n">3</div>
+            <p><b>Preview URL авна.</b> Хариунд шууд нээж болох URL ирнэ. 15 минутын дараа контейнер өөрөө цэвэрлэгдэнэ.</p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Замын зураг</h2>
+        <p class="lead">Өдөр бүр 1%. Нэг асуудал → нэг шийдэл → дараагийнх.</p>
+        <div class="grid">
+          <div class="card">
+            <h3>✅ Хийгдсэн</h3>
+            <p>Preview engine (M1) · Олон файлтай төсөл (M2) · Next.js template (M2.5) · API түлхүүр</p>
+          </div>
+          <div class="card">
+            <h3>🔨 Одоо</h3>
+            <p>Landing сайт · VPS байршуулалт · Дулаан контейнерийн pool</p>
+          </div>
+          <div class="card">
+            <h3>🔭 Дараа</h3>
+            <p>Цэвэр preview домэйн · Сүлжээний тусгаарлалт · gVisor/microVM · Kodu Cloud</p>
+          </div>
+        </div>
+      </section>
+
+      <footer>
+        <div class="status"><span class="dot"></span> Хөгжүүлэлт идэвхтэй явагдаж байна</div>
+        <div>
+          © 2026 Kodu Sandbox ·
+          <a href="https://github.com/Zulzaga0428/SAND" target="_blank" rel="noopener">GitHub</a>
+        </div>
+      </footer>
+    </div>
+  </body>
+</html>
