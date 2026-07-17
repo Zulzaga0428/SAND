@@ -112,10 +112,32 @@
 
 ---
 
-## ⬜ Дараа юунаас үргэлжлүүлэх вэ — VPS шат
+## 🎉🎉 Өдөр 2 (ОРГИЛ) — VPS дээр 24/7 АМЬД боллоо! (2026-07-17)
 
-- **VPS авах** (Hetzner/DigitalOcean г.м) → Docker + controller байрлуулах
-- Жинхэнэ домэйн + wildcard DNS (`*.p.домэйн`) → цэвэр Preview URL (M3)
+- ✅ **Vultr VPS** авсан: Tokyo, Ubuntu 24.04, 1 vCPU / 2GB, ~$10/сар
+  - IP: `202.182.123.79`
+- ✅ **Нэг командаар суулгасан** (`deploy/setup.sh`): Docker + Node + repo +
+  template build + systemd service + ufw — бүгд автоматаар
+- ✅ **Дэлхийд амьд:** `http://202.182.123.79:4000` самбар нээгдэж байна
+- ✅ **Next.js preview ГАР УТСАН дээр** нээгдсэн 📱 — Токиогийн серверээс,
+  контейнер дотроос, useState товч ажиллаж байна. **БҮХ СИСТЕМ END-TO-END
+  АЖИЛЛАЖ БАЙНА!** 🐳⚛️🌍
+
+**Замд тохиолдсон, зассан зүйлс:**
+- Repo Private байсан → серверээс татаж чадаагүй (404) → **Public болгосон**
+- Preview URL `localhost` гэж гарч байсан → `PUBLIC_HOST` env-ээр серверийн
+  IP тавьдаг болгосон (systemd drop-in override-оор тохируулсан)
+- App горим 2 CPU байсан → 1 vCPU VPS-д таарахгүй → `CPUS_APP` default 1 болгов
+- Desktop дээр `ERR_TOO_MANY_REDIRECTS` — browser cookie/cache quirk (raw IP-д),
+  incognito-д ажилладаг. Домэйн + HTTPS хийхээр арилна.
+
+---
+
+## ⬜ Дараа юунаас үргэлжлүүлэх вэ — M3 (домэйн + HTTPS)
+
+- Домэйн авах (kodusandbox.mn эсвэл хямд .com/.dev)
+- DNS: `api.домэйн` → IP, `*.p.домэйн` → IP (wildcard)
+- **Caddy reverse proxy** → HTTPS + цэвэр preview URL (raw IP redirect quirk ч арилна)
 - Гадагшаа сүлжээг iptables-ээр хаах (аюулгүй байдлын сүүлийн алхам)
 - Дараа нь: KoDu-д client бичих → E2B-тэй зэрэгцээ shadow-тест (M5)
 
