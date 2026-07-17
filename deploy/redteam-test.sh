@@ -13,10 +13,11 @@ IMG=node:20-alpine
 PASS=0
 FAIL=0
 
-ok()   { echo "  ✅ PASS: $1"; PASS=$((PASS+1)); }
-bad()  { echo "  ❌ FAIL: $1"; FAIL=$((FAIL+1)); }
+ok()  { echo "  ✅ PASS: $1"; PASS=$((PASS+1)); }
+bad() { echo "  ❌ FAIL: $1"; FAIL=$((FAIL+1)); }
 
-# Sandbox контейнертэй ЯГ ижил хамгаалалттайгаар команд ажиллуулна
+# Sandbox контейнертэй ЯГ ижил хамгаалалттайгаар команд ажиллуулна.
+# (docker-ийг ШУУД дуудна — timeout+функцийн асуудлаас зайлсхийнэ.)
 sb() {
   docker run --rm --network "$NETWORK" \
     --cap-drop ALL --security-opt no-new-privileges \
@@ -24,17 +25,33 @@ sb() {
     "$IMG" "$@" 2>/dev/null
 }
 
+# node-оор TCP холболт оролдох скрипт (DNS хэрэггүй, node заавал байдаг).
+# Холбогдвол "OPEN" хэвлээд гарна; хаалттай бол хугацаа дуусч чимээгүй гарна.
+tcp_test() {
+  local host="$1" port="$2"
+  sb node -e "
+    const net=require('net');
+    const s=net.connect($port,'$host');
+    s.setTimeout(6000);
+    s.on('connect',()=>{console.log('OPEN');s.destroy();process.exit(0)});
+    s.on('timeout',()=>process.exit(1));
+    s.on('error',()=>process.exit(1));
+  "
+}
+
 echo ""
-echo "=== 1. Интернэт рүү гарах оролдлого (ХААГДСАН байх ёстой) ==="
-if timeout 20 sb sh -c 'wget -T 5 -q -O- http://example.com >/dev/null'; then
-  bad "Контейнер интернэт рүү гарч чадсан!"
+echo "=== 1. Интернэт рүү гарах (ХААГДСАН байх ёстой) ==="
+# 1.1.1.1:53 = Cloudflare DNS, дэлхийд үргэлж нээлттэй тогтвортой цэг
+if tcp_test 1.1.1.1 53 | grep -q OPEN; then
+  bad "Контейнер интернэт рүү холбогдож чадсан (1.1.1.1:53)!"
 else
   ok "Интернэт хаалттай — гадагш дайрч чадахгүй"
 fi
 
-echo "=== 2. Cloud метадата хулгайлах оролдлого (ХААГДСАН байх ёстой) ==="
-if timeout 15 sb sh -c 'wget -T 5 -q -O- http://169.254.169.254/ >/dev/null'; then
-  bad "Метадата уншигдсан — нууц түлхүүр алдагдаж болзошгүй!"
+echo "=== 2. Cloud метадата хулгайлах (ХААГДСАН байх ёстой) ==="
+# 169.254.169.254 = cloud metadata (нууц түлхүүр агуулж болзошгүй)
+if tcp_test 169.254.169.254 80 | grep -q OPEN; then
+  bad "Метадата хаяг руу холбогдсон — нууц алдагдаж болзошгүй!"
 else
   ok "Метадата хаалттай"
 fi
@@ -56,7 +73,6 @@ else
 fi
 
 echo "=== 5. Контейнер хоорондын халдлага (icc=false, ХААГДСАН байх ёстой) ==="
-# Хоёр контейнер асаагаад нэгээс нь нөгөө рүү ping хийж үзнэ
 V1=$(docker run -d --network "$NETWORK" "$IMG" sleep 60)
 V2=$(docker run -d --network "$NETWORK" "$IMG" sleep 60)
 IP1=$(docker inspect -f "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}" "$V1")
