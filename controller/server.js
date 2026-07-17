@@ -8,7 +8,7 @@ const express = require("express");
 const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
-const { createPreview, listPreviews, stopPreview } = require("./sandbox");
+const { init, createPreview, listPreviews, stopPreview } = require("./sandbox");
 
 // ── API түлхүүр ──────────────────────────────────────────────────────────
 // Дараалал: 1) KODU_SANDBOX_KEY орчны хувьсагч, 2) .kodu-key файл,
@@ -96,4 +96,6 @@ app.listen(PORT, () => {
   console.log(`  → http://localhost:${PORT}`);
   console.log(`  🔑 API түлхүүр: ${API_KEY}`);
   console.log("     (самбар нээхэд энэ түлхүүрийг асуувал үүнийг хуулж өгнө)\n");
+  // Цэвэрлэгээ + сүлжээ + дулаан pool-ыг ард нь эхлүүлнэ
+  init().catch((e) => console.error("init алдаа:", e.message));
 });
