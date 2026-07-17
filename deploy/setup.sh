@@ -42,7 +42,10 @@ echo "=== [5/6] Controller тохируулж байна..."
 cd /opt/kodu-sandbox/controller
 npm install --omit=dev --no-audit --no-fund
 
-cat > /etc/systemd/system/kodu-sandbox.service <<'EOF'
+# Preview URL-д хэрэглэх нийтийн IP-г автоматаар олно
+PUBLIC_IP=$(curl -s ifconfig.me || hostname -I | awk '{print $1}')
+
+cat > /etc/systemd/system/kodu-sandbox.service <<EOF
 [Unit]
 Description=Kodu Sandbox Controller
 After=docker.service network-online.target
@@ -55,13 +58,15 @@ Restart=always
 RestartSec=3
 Environment=PORT=4000
 Environment=WARM_POOL_SIZE=1
+Environment=PUBLIC_HOST=${PUBLIC_IP}
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
-systemctl enable --now kodu-sandbox
+systemctl enable kodu-sandbox
+systemctl restart kodu-sandbox
 
 echo "=== [6/6] Галт хана тохируулж байна..."
 if command -v ufw &>/dev/null; then

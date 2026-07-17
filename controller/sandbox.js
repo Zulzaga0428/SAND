@@ -26,6 +26,9 @@ const INTERNAL_PORT = "3000/tcp"; // контейнер доторх вэб се
 const TTL_MS = 15 * 60 * 1000; // 15 мин дараа автоматаар устна
 const WARM_POOL_SIZE = parseInt(process.env.WARM_POOL_SIZE || "1", 10);
 const NETWORK = "kodu-sandbox-net"; // тусгаарлагдсан сүлжээ
+// Preview URL-д хэрэглэх хаяг: локалд "localhost", VPS дээр нийтийн IP/домэйн
+// (setup.sh скрипт үүнийг серверийн IP-гээр автоматаар тохируулдаг)
+const PUBLIC_HOST = process.env.PUBLIC_HOST || "localhost";
 
 // containerId -> setTimeout (TTL таймер)
 const timers = new Map();
@@ -187,7 +190,7 @@ function hostConfig(isApp) {
 async function urlOf(container) {
   const info = await container.inspect();
   const hostPort = info.NetworkSettings.Ports[INTERNAL_PORT][0].HostPort;
-  return `http://localhost:${hostPort}`;
+  return `http://${PUBLIC_HOST}:${hostPort}`;
 }
 
 // ── ♨️ Дулаан pool ────────────────────────────────────────────────────────
@@ -356,7 +359,7 @@ async function listPreviews() {
       const p = (c.Ports || []).find((x) => x.PublicPort);
       return {
         id: c.Id,
-        url: p ? `http://localhost:${p.PublicPort}` : null,
+        url: p ? `http://${PUBLIC_HOST}:${p.PublicPort}` : null,
         state: c.State,
       };
     });
