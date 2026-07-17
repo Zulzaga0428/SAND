@@ -26,6 +26,10 @@ const INTERNAL_PORT = "3000/tcp"; // контейнер доторх вэб се
 const TTL_MS = 15 * 60 * 1000; // 15 мин дараа автоматаар устна
 const WARM_POOL_SIZE = parseInt(process.env.WARM_POOL_SIZE || "1", 10);
 const NETWORK = "kodu-sandbox-net"; // тусгаарлагдсан сүлжээ
+// Контейнерт өгөх CPU. Сервер цөөн цөмтэй бол (жишээ 1 vCPU VPS) энэ хэтрэхгүй
+// байх ёстой. Хэрэгцээгээр нь тохируулна: KODU_APP_CPUS / KODU_STATIC_CPUS.
+const CPUS_APP = parseFloat(process.env.KODU_APP_CPUS || "1");
+const CPUS_STATIC = parseFloat(process.env.KODU_STATIC_CPUS || "0.5");
 // Preview URL-д хэрэглэх хаяг: локалд "localhost", VPS дээр нийтийн IP/домэйн
 // (setup.sh скрипт үүнийг серверийн IP-гээр автоматаар тохируулдаг)
 const PUBLIC_HOST = process.env.PUBLIC_HOST || "localhost";
@@ -179,8 +183,9 @@ function hostConfig(isApp) {
     // Docker чөлөөт порт өөрөө сонгоно (HostPort хоосон)
     PortBindings: { [INTERNAL_PORT]: [{ HostPort: "" }] },
     // 🔒 дүрэм #4: нөөцийн хязгаар. Next.js dev server илүү их RAM иддэг.
+    // CPU нь серверийн бодит цөмийн тооноос хэтрэхгүй (VPS ихэвчлэн 1 vCPU).
     Memory: (isApp ? 1024 : 512) * 1024 * 1024,
-    NanoCpus: (isApp ? 2 : 1) * 1_000_000_000,
+    NanoCpus: Math.round((isApp ? CPUS_APP : CPUS_STATIC) * 1_000_000_000),
     PidsLimit: 256,
     AutoRemove: true, // 🔒 дүрэм #2: зогсмогц устана (ephemeral)
     NetworkMode: NETWORK, // 🔒 тусгаарлагдсан сүлжээ (контейнер хооронд icc=false)
