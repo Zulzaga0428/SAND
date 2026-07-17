@@ -16,7 +16,8 @@ const docker =
     ? new Docker({ socketPath: "//./pipe/docker_engine" })
     : new Docker({ socketPath: "/var/run/docker.sock" });
 
-const IMAGE = "node:20-alpine"; // жижиг, хурдан image
+const IMAGE = "node:20-alpine"; // static горим: жижиг, хурдан image
+const IMAGE_APP = "kodu-template-next"; // app горим: node_modules бэлэн Next.js template
 const INTERNAL_PORT = "3000/tcp"; // контейнер доторх вэб серверийн порт
 const TTL_MS = 15 * 60 * 1000; // 15 мин дараа автоматаар устна
 
@@ -71,8 +72,9 @@ function sanitizePath(p) {
 }
 
 // files = [{ path: "index.html", content: "..." }, ...] массивыг
-// tar архив (Buffer) болгоно. Бүх файл app/ фолдер дор орно.
-function filesToTar(files) {
+// tar архив (Buffer) болгоно. prefix нь файл бүрийн урд залгагдана
+// (static горимд "app/" — контейнерийн /app дотор орохын тулд).
+function filesToTar(files, prefix = "") {
   return new Promise((resolve, reject) => {
     const pack = tar.pack();
     const chunks = [];
@@ -80,11 +82,13 @@ function filesToTar(files) {
     pack.on("end", () => resolve(Buffer.concat(chunks)));
     pack.on("error", reject);
 
-    // /app фолдерыг бүх хэрэглэгч уншиж чадахаар үүсгэнэ
-    pack.entry({ name: "app/", type: "directory", mode: 0o755 });
+    if (prefix) {
+      // prefix фолдерыг бүх хэрэглэгч уншиж чадахаар үүсгэнэ
+      pack.entry({ name: prefix, type: "directory", mode: 0o755 });
+    }
     for (const f of files) {
       pack.entry(
-        { name: "app/" + sanitizePath(f.path), mode: 0o644 },
+        { name: prefix + sanitizePath(f.path), mode: 0o644 },
         String(f.content ?? "")
       );
     }
@@ -92,53 +96,109 @@ function filesToTar(files) {
   });
 }
 
+// Next.js template image бэлэн эсэхийг шалгана (build хийгдсэн байх ёстой)
+async function ensureAppImage() {
+  const images = await docker.listImages({
+    filters: { reference: [IMAGE_APP] },
+  });
+  if (!images.length) {
+    throw new Error(
+      `'${IMAGE_APP}' image алга. Эхлээд build хий: cd template && docker build -t ${IMAGE_APP} .`
+    );
+  }
+}
+
+// Preview URL хариу өгч эхэлтэл хүлээнэ (Next.js асахад хэдэн секунд авдаг)
+async function waitForReady(url, timeoutMs = 90_000) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
+      if (res.ok || res.status < 500) return;
+    } catch (_) {
+      // хараахан бэлэн болоогүй — дахин оролдоно
+    }
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  throw new Error("Preview хугацаандаа бэлэн болсонгүй (90 сек)");
+}
+
 // Нэг preview контейнер асаана.
 // files = төслийн файлууд [{path, content}].
+// mode  = "static" (M2: HTML/CSS/JS) эсвэл "app" (M2.5: Next.js).
 // (Хуучин хэлбэр: string өгвөл ганц index.html гэж үзнэ — M1-тэй нийцтэй.)
-async function createPreview(files) {
-  await ensureImage();
+async function createPreview(files, mode = "static") {
+  const isApp = mode === "app";
+
+  if (isApp) {
+    await ensureAppImage();
+  } else {
+    await ensureImage();
+  }
 
   if (typeof files === "string") {
     files = [{ path: "index.html", content: files }];
   }
   if (!Array.isArray(files) || !files.length) {
-    files = [
-      { path: "index.html", content: "<h1>Сайн уу, Kodu Sandbox! 🐳</h1>" },
-    ];
+    files = isApp
+      ? []
+      : [{ path: "index.html", content: "<h1>Сайн уу, Kodu Sandbox! 🐳</h1>" }];
   }
 
   const container = await docker.createContainer({
-    Image: IMAGE,
-    Cmd: ["node", "-e", SERVER_SCRIPT],
-    User: "node", // 🔒 дүрэм #3: root биш хэрэглэгчээр ажиллана
+    Image: isApp ? IMAGE_APP : IMAGE,
+    // app горимд template image-ийн CMD (npm run dev) өөрөө ажиллана
+    ...(isApp ? {} : { Cmd: ["node", "-e", SERVER_SCRIPT], User: "node" }),
     ExposedPorts: { [INTERNAL_PORT]: {} },
     HostConfig: {
       // Docker чөлөөт порт өөрөө сонгоно (HostPort хоосон)
       PortBindings: { [INTERNAL_PORT]: [{ HostPort: "" }] },
-      Memory: 512 * 1024 * 1024, // 🔒 дүрэм #4: 512MB хязгаар
-      NanoCpus: 1_000_000_000, //  🔒 дүрэм #4: 1 CPU хязгаар
-      PidsLimit: 256, //             🔒 дүрэм #4: process тоо хязгаар
-      AutoRemove: true, //           🔒 дүрэм #2: зогсмогц устана (ephemeral)
+      // 🔒 дүрэм #4: нөөцийн хязгаар. Next.js dev server илүү их RAM иддэг
+      // тул app горимд 1GB / 2 CPU өгнө.
+      Memory: (isApp ? 1024 : 512) * 1024 * 1024,
+      NanoCpus: (isApp ? 2 : 1) * 1_000_000_000,
+      PidsLimit: 256,
+      AutoRemove: true, // 🔒 дүрэм #2: зогсмогц устана (ephemeral)
     },
     Labels: { "kodu.sandbox": "preview" }, // өөрсдийн контейнераа таних тэмдэг
   });
 
-  // M2-ийн ГОЛ АЛХАМ: файлуудыг tar болгоод контейнерийн / дээр задална
-  // (app/ prefix-тэй тул /app дотор бичигдэнэ). Асаахаас ӨМНӨ хийнэ.
-  const archive = await filesToTar(files);
-  await container.putArchive(archive, { path: "/" });
+  // ГОЛ АЛХАМ: файлуудыг tar болгоод контейнер руу бичнэ. Асаахаас ӨМНӨ хийнэ.
+  // static: /app дотор (static серверийн root)
+  // app:    /home/node/app дотор (Next.js төслийн root) — хэрэглэгчийн файлууд
+  //         template-ийн app/page.js зэргийг ДАРЖ бичнэ.
+  if (files.length) {
+    if (isApp) {
+      const archive = await filesToTar(files, "");
+      await container.putArchive(archive, { path: "/home/node/app" });
+    } else {
+      const archive = await filesToTar(files, "app/");
+      await container.putArchive(archive, { path: "/" });
+    }
+  }
 
   await container.start();
 
   // Docker ямар порт сонгосныг олж авна
   const info = await container.inspect();
   const hostPort = info.NetworkSettings.Ports[INTERNAL_PORT][0].HostPort;
+  const url = `http://localhost:${hostPort}`;
 
   // 🔒 дүрэм #2: TTL — 15 мин дараа автоматаар устгана
   const t = setTimeout(() => stopPreview(container.id).catch(() => {}), TTL_MS);
   timers.set(container.id, t);
 
-  return { id: container.id, url: `http://localhost:${hostPort}` };
+  // Next.js асч дуустал хүлээнэ (static бол шууд бэлэн)
+  if (isApp) {
+    try {
+      await waitForReady(url);
+    } catch (e) {
+      await stopPreview(container.id);
+      throw e;
+    }
+  }
+
+  return { id: container.id, url };
 }
 
 // Ажиллаж буй бүх preview-г жагсаана

@@ -14,11 +14,15 @@ app.get("/", (req, res) => {
 });
 
 // Шинэ preview үүсгэх.
-// M2: { files: [{path, content}, ...] } хүлээж авна.
+// M2:   { files: [{path, content}, ...] } — static сайт
+// M2.5: { files: [...], mode: "app" } — Next.js апп (template image хэрэгтэй)
 // M1-тэй нийцтэй: { html: "..." } өгвөл ганц index.html гэж үзнэ.
 app.post("/api/previews", async (req, res) => {
   try {
-    const result = await createPreview(req.body.files || req.body.html);
+    const result = await createPreview(
+      req.body.files || req.body.html,
+      req.body.mode || "static"
+    );
     res.json(result);
   } catch (e) {
     console.error("createPreview алдаа:", e.message);

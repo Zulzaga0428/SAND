@@ -17,6 +17,20 @@
       h1 { font-size: 22px; margin: 0 0 4px; }
       .sub { color: #8b93a7; font-size: 14px; margin: 0 0 24px; }
 
+      /* Горим сонгогч */
+      .modes { display: flex; gap: 8px; margin-bottom: 12px; }
+      .mode {
+        cursor: pointer;
+        border: 1px solid #26304c;
+        border-radius: 10px;
+        background: #131a2e;
+        color: #a7b0c4;
+        font-size: 13px;
+        font-weight: 600;
+        padding: 8px 14px;
+      }
+      .mode.active { background: #6d5efc; border-color: #6d5efc; color: #fff; }
+
       /* Файлын editor */
       .editor {
         border: 1px solid #26304c;
@@ -126,9 +140,14 @@
     <div class="wrap">
       <h1>🐳 Kodu Sandbox — Preview Controller</h1>
       <p class="sub">
-        M2: Олон файлтай төслөө бич → "Preview үүсгэх" дар. Код нь файлуудыг чинь
-        ДОКЕР КОНТЕЙНЕР дотор бичиж, тэндээс сайтыг чинь үзүүлнэ. Яг KoDu-гийн preview шиг.
+        Төслөө бич → "Preview үүсгэх" дар. Код нь файлуудыг чинь ДОКЕР КОНТЕЙНЕР
+        дотор бичиж, тэндээс сайтыг чинь үзүүлнэ. Яг KoDu-гийн preview шиг.
       </p>
+
+      <div class="modes">
+        <button class="mode active" id="mode-static">Static (HTML/CSS/JS)</button>
+        <button class="mode" id="mode-app">Next.js апп ⚛️</button>
+      </div>
 
       <div class="editor">
         <div class="tabs" id="tabs"></div>
@@ -145,9 +164,12 @@
     <script>
       const $ = (id) => document.getElementById(id);
 
-      // ── Файлын төлөв ─────────────────────────────────────────────
-      // Эхлээд 3 файлтай жишээ төсөл өгнө — олон файл ажилладагийг шууд харуулна.
-      let files = [
+      // ── Горим ба файлын төлөв ────────────────────────────────────
+      // static: HTML/CSS/JS (жижиг static сервер)
+      // app:    Next.js (node_modules бэлэн template image дээр)
+      let mode = "static";
+
+      const staticFiles = [
         {
           path: "index.html",
           content:
@@ -164,7 +186,31 @@
             'let n = 0;\ndocument.getElementById("btn").onclick = () => {\n  n++;\n  document.getElementById("out").textContent =\n    `Чи ${n} удаа дарлаа — JS ч бас контейнер дотроос ажиллаж байна! 🎉`;\n};',
         },
       ];
+
+      // Next.js жишээ — app/page.js нь template-ийн хуудсыг дарж бичигдэнэ.
+      const appFiles = [
+        {
+          path: "app/page.js",
+          content:
+            '"use client";\nimport { useState } from "react";\n\nexport default function Home() {\n  const [n, setN] = useState(0);\n  return (\n    <main style={{ maxWidth: 600, margin: "60px auto", padding: "0 20px" }}>\n      <h1 style={{ color: "#6d5efc" }}>Next.js контейнер дотор! ⚛️🐳</h1>\n      <p>\n        Энэ бол <b>жинхэнэ Next.js апп</b> — React, useState бүгд Kodu Sandbox\n        контейнер дотроос ажиллаж байна.\n      </p>\n      <button\n        onClick={() => setN(n + 1)}\n        style={{\n          background: "#6d5efc",\n          color: "#fff",\n          border: "none",\n          borderRadius: 8,\n          padding: "10px 18px",\n          fontSize: 15,\n          cursor: "pointer",\n        }}\n      >\n        Дарсан тоо: {n}\n      </button>\n    </main>\n  );\n}',
+        },
+      ];
+
+      let files = staticFiles;
       let active = 0;
+
+      function setMode(m) {
+        if (m === mode) return;
+        mode = m;
+        files = m === "app" ? appFiles : staticFiles;
+        active = 0;
+        document.getElementById("mode-static").classList.toggle("active", m === "static");
+        document.getElementById("mode-app").classList.toggle("active", m === "app");
+        renderTabs();
+        renderContent();
+      }
+      document.getElementById("mode-static").onclick = () => setMode("static");
+      document.getElementById("mode-app").onclick = () => setMode("app");
 
       function renderTabs() {
         const tabs = $("tabs");
@@ -254,12 +300,15 @@
         saveContent();
         const btn = $("create");
         btn.disabled = true;
-        btn.textContent = "Контейнер асааж байна…";
+        btn.textContent =
+          mode === "app"
+            ? "Next.js асааж байна… (10–60 сек)"
+            : "Контейнер асааж байна…";
         try {
           const res = await fetch("/api/previews", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ files }),
+            body: JSON.stringify({ files, mode }),
           });
           const data = await res.json();
           if (data.url) {

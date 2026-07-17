@@ -43,16 +43,41 @@
 
 ---
 
-## ⬜ Дараа юунаас үргэлжлүүлэх вэ — M2.5 / M3
+## ✅ Өдөр 2 (үргэлжлэл) — M2.5: Next.js контейнер дотор (2026-07-17)
 
-**Зорилго:** Жинхэнэ **Next.js/Vite төслийг** контейнер дотор ажиллуулах.
+**Юу хийсэн:**
 
-Санаанууд:
-- `node_modules` урьдчилан суулгасан **template image** build хийх
-  (хэрэглэгч бүрт npm install хийхгүй — хурдны гол нууц)
-- Контейнер дотор `npm run dev` ажиллуулж, бэлэн болтол хүлээгээд preview өгөх
-- Хэд хэдэн preview зэрэг ажиллуулж туршиж үзэх
-- Дараа нь: цэвэр Preview URL routing, дулаан pool (M3)
+- ✅ **Архитектурын шийдвэр** ([architecture.md](architecture.md)): Kodu Sandbox
+  бол KoDu-гийн дотоод хэсэг БИШ — **тусдаа сайт/үйлчилгээ + API.**
+  KoDu хожим зөвхөн API-аар холбогдоно (яг E2B шиг).
+- ✅ **M2.5: жинхэнэ Next.js апп контейнер дотор ажилладаг боллоо** ⚛️
+  - `template/` — Next.js суурь төсөл + Dockerfile. `node_modules`-ийг
+    image дотор УРЬДЧИЛАН суулгана → preview болгонд npm install хийхгүй
+  - controller-д **app горим**: template image-ээс контейнер асаана →
+    хэрэглэгчийн файл template-ийн файлыг дарж бичигдэнэ → `next dev` →
+    бэлэн болтол хүлээнэ (90 сек хүртэл) → URL буцаана
+  - Next.js-д 1GB RAM / 2 CPU (static-д 512MB/1 CPU хэвээрээ)
+  - UI: "Static" / "Next.js апп ⚛️" горим сонгогч, useState-тэй жишээ
+- ✅ **Бүрэн туршиж баталсан:** custom `app/page.js` өгөөд контейнер аслаа,
+  Next.js render хийсэн (200, _next asset-ууд гарсан), устгал цэвэрхэн
+
+**Дадлагаар мэдсэн зүйл:**
+- Удаан сүлжээнд npm install контейнер дотор timeout болдог →
+  Dockerfile-д `NPM_REGISTRY` build-arg нэмсэн. Ажилласан build:
+  `docker build --build-arg NPM_REGISTRY=https://registry.npmmirror.com -t kodu-template-next .`
+- Арын дэвсгэрийн урт ажил session солигдоход тасардаг — том build-ийг
+  тасалдвал дахин эхлүүлэхэд Docker layer cache тусалдаг
+
+---
+
+## ⬜ Дараа юунаас үргэлжлүүлэх вэ — M3 + API үйлчилгээ болгох
+
+- API түлхүүрийн шалгалт (`Authorization: Bearer ...`) — тусдаа үйлчилгээ
+  болохын эхний алхам
+- Цэвэр Preview URL routing (санамсаргүй порт биш)
+- Дулаан контейнерийн pool (Next.js-ийн асах хугацааг нуух)
+- Сүлжээний хязгаарлалт (аюулгүй байдал)
+- Хожим: VPS дээр байрлуулах → KoDu-д client бичих → E2B-тэй зэрэгцээ shadow-тест
 
 ---
 

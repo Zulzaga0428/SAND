@@ -1,4 +1,4 @@
-# controller/ — Kodu Sandbox Preview Controller (M2)
+# controller/ — Kodu Sandbox Preview Controller (M2.5)
 
 Kodu Sandbox-ийн **цөм**: Node + [`dockerode`] ашиглан контейнерийг **кодоор**
 асааж, төслийн файлуудыг дотор нь бичээд, preview URL буцаадаг — яг KoDu
@@ -13,6 +13,10 @@ Kodu Sandbox-ийн **цөм**: Node + [`dockerode`] ашиглан контей
 ## Юу хийдэг вэ (M2)
 
 - ✅ Кодоор контейнер **асаана / жагсаана / устгана**
+- ✅ **Хоёр горим:**
+  - **Static** — HTML/CSS/JS файлуудыг жижиг static сервер үзүүлнэ (шууд асна)
+  - **App ⚛️** — **жинхэнэ Next.js апп** `node_modules` бэлэн template image
+    дээр `next dev`-ээр ажиллана (эхлээд `template/`-ийг build хийсэн байх ёстой)
 - ✅ **Олон файлтай төсөл** (HTML + CSS + JS + дэд фолдер) дэмжинэ
   - Файлуудыг tar архив болгож `putArchive`-аар контейнер руу бичнэ —
     жинхэнэ sandbox-уудын (E2B гэх мэт) ашигладаг арга
@@ -29,6 +33,11 @@ Kodu Sandbox-ийн **цөм**: Node + [`dockerode`] ашиглан контей
 
 - **Docker Desktop** ажиллаж байх ёстой (халим 🐳 ногоон "running")
 - **Node.js** суусан байх ([nodejs.org](https://nodejs.org) — LTS хувилбар)
+- **App горимд:** Next.js template image-ийг нэг удаа build хийсэн байх:
+  ```bash
+  cd template
+  docker build -t kodu-template-next .
+  ```
 
 ## Ажиллуулах
 
@@ -53,7 +62,7 @@ http://localhost:4000
 
 | Хүсэлт | Үүрэг |
 |--------|-------|
-| `POST /api/previews` | `{ files: [{path, content}, ...] }` → контейнер асаана, `{id, url}` буцаана. (`{html: "..."}` хуучин хэлбэрийг ч дэмжинэ) |
+| `POST /api/previews` | `{ files: [{path, content}, ...], mode: "static"\|"app" }` → контейнер асаана, `{id, url}` буцаана. (`{html: "..."}` хуучин хэлбэрийг ч дэмжинэ) |
 | `GET /api/previews` | Ажиллаж буй preview-уудын жагсаалт |
 | `DELETE /api/previews/:id` | Preview зогсоож устгана |
 
@@ -65,11 +74,10 @@ http://localhost:4000
 | `server.js` | HTTP сервер + API |
 | `public/index.html` | Хяналтын самбар — файлын tab-тай editor |
 
-## Дараагийн алхам (M2.5 / M3)
+## Дараагийн алхам (M3)
 
-- **Next.js/Vite төслийг** контейнер дотор `npm install && npm run dev`-ээр
-  ажиллуулах (үүнд урьдчилан бэлдсэн template image хэрэгтэй)
 - Preview URL-ийг цэвэр домэйн болгож routing хийх
-- Дулаан контейнерийн pool (хурд)
+- Дулаан контейнерийн pool (хурд — Next.js-ийн асах хугацааг нуух)
+- Сүлжээний хязгаарлалт (аюулгүй байдал)
 
 [`dockerode`]: https://github.com/apocas/dockerode
