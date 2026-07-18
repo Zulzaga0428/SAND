@@ -106,6 +106,30 @@ app.get("/__caddy_ask", (req, res) => {
   return isPreviewHost(domain) ? res.status(200).send("ok") : res.status(403).send("no");
 });
 
+// ── 📱 Хурд хэмжих endpoint ─────────────────────────────────────────────────
+// Токио сервер → хэрэглэгчийн (утас) хооронд татах хурдыг хэмжинэ.
+// E2B-ийн ~250KB/s-тэй харьцуулах native замын шийдвэрт хэрэгтэй.
+// Утаснаас нээ:  https://<домэйн>/__speedtest?mb=20   (эсвэл http://IP:4000/...)
+// Түлхүүр шаардахгүй. Дээд хэмжээ 100MB.
+app.get("/__speedtest", (req, res) => {
+  const mb = Math.min(Math.max(parseInt(req.query.mb, 10) || 10, 1), 100);
+  const total = mb * 1024 * 1024;
+  res.setHeader("Content-Type", "application/octet-stream");
+  res.setHeader("Content-Length", String(total));
+  res.setHeader("Content-Disposition", `attachment; filename="speedtest-${mb}mb.bin"`);
+  res.setHeader("Cache-Control", "no-store");
+  const chunk = Buffer.alloc(256 * 1024); // 256KB (path-д шахалт байхгүй тул түүхий хурд)
+  let sent = 0;
+  (function pump() {
+    while (sent < total) {
+      const buf = total - sent < chunk.length ? chunk.subarray(0, total - sent) : chunk;
+      sent += buf.length;
+      if (!res.write(buf)) return res.once("drain", pump);
+    }
+    res.end();
+  })();
+});
+
 // ── Rate limit ─────────────────────────────────────────────────────────────
 const RATE_WINDOW_MS = 60_000;
 const RATE_MAX = parseInt(process.env.RATE_MAX || "30", 10);
