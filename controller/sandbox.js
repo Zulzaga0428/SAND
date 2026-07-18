@@ -38,10 +38,21 @@ const CPUS_STATIC = parseFloat(process.env.KODU_STATIC_CPUS || "0.5");
 // (setup.sh скрипт үүнийг серверийн IP-гээр автоматаар тохируулдаг)
 const PUBLIC_HOST = process.env.PUBLIC_HOST || "localhost";
 
+// 🌐 Домэйн горим: PREVIEW_DOMAIN тохируулбал (жишээ "prw.hisainuu.online")
+// preview URL нь https://<id>.<PREVIEW_DOMAIN> болно (Caddy HTTPS + subdomain
+// routing). Контейнерийн порт зөвхөн 127.0.0.1-д нээгдэнэ (гаднаас шууд хүрэхгүй,
+// зөвхөн Caddy → controller proxy-гоор). Тохируулаагүй бол хуучин http://IP:port.
+const PREVIEW_DOMAIN = process.env.PREVIEW_DOMAIN || "";
+const DOMAIN_MODE = !!PREVIEW_DOMAIN;
+
 // containerId -> setTimeout (TTL таймер)
 const timers = new Map();
+// 🌐 subdomain routing: shortId(12) -> host port. Домэйн горимд proxy
+// <shortid>.<PREVIEW_DOMAIN> хүсэлтийг зөв контейнер руу чиглүүлэхэд ашиглана.
+const routes = new Map();
+const shortId = (id) => id.slice(0, 12);
 // ♨️ Дулаан pool: урьдчилан асаасан, хэрэглэгч хүлээж буй Next.js контейнерууд
-const warmPool = []; // [{ id, url }]
+const warmPool = []; // [{ id, port }]
 // Pool-оос хэрэглэгчид олгогдсон контейнерууд (label нь "warm" хэвээр тул
 // жагсаалтад харуулахын тулд энд бүртгэнэ)
 const claimedWarm = new Set();
@@ -184,8 +195,12 @@ async function waitForReady(url, timeoutMs = 90_000) {
 // ── Контейнер үүсгэх суурь тохиргоо ──────────────────────────────────────
 function hostConfig(isApp) {
   return {
-    // Docker чөлөөт порт өөрөө сонгоно (HostPort хоосон)
-    PortBindings: { [INTERNAL_PORT]: [{ HostPort: "" }] },
+    // Docker чөлөөт порт өөрөө сонгоно (HostPort хоосон).
+    // 🔒 Домэйн горимд зөвхөн 127.0.0.1-д нээнэ — preview-д гаднаас шууд
+    // (IP:порт-оор) хүрэхгүй, зөвхөн Caddy → controller proxy-гоор л хүрнэ.
+    PortBindings: {
+      [INTERNAL_PORT]: [{ HostIp: DOMAIN_MODE ? "127.0.0.1" : "", HostPort: "" }],
+    },
     // 🔒 дүрэм #4: нөөцийн хязгаар. Next.js dev server илүү их RAM иддэг.
     // CPU нь серверийн бодит цөмийн тооноос хэтрэхгүй (VPS ихэвчлэн 1 vCPU).
     Memory: (isApp ? 1024 : 512) * 1024 * 1024,
@@ -202,10 +217,37 @@ function hostConfig(isApp) {
   };
 }
 
-async function urlOf(container) {
+// Контейнерийн host дээрх портыг олж авна
+async function portOf(container) {
   const info = await container.inspect();
-  const hostPort = info.NetworkSettings.Ports[INTERNAL_PORT][0].HostPort;
-  return `http://${PUBLIC_HOST}:${hostPort}`;
+  return info.NetworkSettings.Ports[INTERNAL_PORT][0].HostPort;
+}
+
+// Controller дотроос контейнерт хүрэх дотоод хаяг (readiness шалгах, proxy target)
+const internalUrl = (port) => `http://127.0.0.1:${port}`;
+
+// Хэрэглэгчид буцаах нийтийн хаяг:
+//   домэйн горим:  https://<shortid>.<PREVIEW_DOMAIN>
+//   энгийн горим:  http://<PUBLIC_HOST>:<port>
+function publicUrl(id, port) {
+  return DOMAIN_MODE
+    ? `https://${shortId(id)}.${PREVIEW_DOMAIN}`
+    : `http://${PUBLIC_HOST}:${port}`;
+}
+
+// subdomain routing туслахууд (server.js-ийн proxy ашиглана)
+function resolvePort(sub) {
+  return routes.get(sub);
+}
+// Домэйн горимд host зөв preview subdomain эсэхийг шалгана (Caddy on-demand TLS ask)
+function isPreviewHost(host) {
+  if (!DOMAIN_MODE || !host) return false;
+  const h = host.split(":")[0].toLowerCase();
+  if (h === PREVIEW_DOMAIN) return true; // суурь домэйн (dashboard/API)
+  const suffix = "." + PREVIEW_DOMAIN;
+  if (!h.endsWith(suffix)) return false;
+  const sub = h.slice(0, -suffix.length);
+  return routes.has(sub); // зөвхөн бодит preview subdomain-д гэрчилгээ олгоно
 }
 
 // ── ♨️ Дулаан pool ────────────────────────────────────────────────────────
@@ -222,13 +264,14 @@ async function startWarmContainer() {
     Labels: { "kodu.sandbox": "warm" },
   });
   await container.start();
-  const url = await urlOf(container);
-  await waitForReady(url);
+  const port = await portOf(container);
+  const iurl = internalUrl(port);
+  await waitForReady(iurl);
   // Эхний хуудсыг нэг дуудаж compile хийлгэчихнэ — бүрэн "халсан" болно
   try {
-    await fetch(url, { signal: AbortSignal.timeout(30_000) });
+    await fetch(iurl, { signal: AbortSignal.timeout(30_000) });
   } catch (_) {}
-  return { id: container.id, url };
+  return { id: container.id, port };
 }
 
 // Pool-ыг зорилтот хэмжээнд хүртэл дүүргэнэ (зэрэг нэг л ажиллана)
@@ -266,6 +309,9 @@ async function init() {
   if (stale.length) {
     console.log(`  🧹 Өмнөх ажиллагааны ${stale.length} контейнер цэвэрлэлээ`);
   }
+  routes.clear();
+  warmPool.length = 0;
+  claimedWarm.clear();
   warmUp(); // pool-ыг ард нь дүүргэж эхэлнэ (хүлээхгүй)
 }
 
@@ -323,11 +369,12 @@ async function createPreview(files, mode = "static", ttlMs) {
       }
       // Нэг дуудаж шинэ хуудсыг compile хийлгэнэ (хүсэлт compile дуустал хүлээдэг)
       try {
-        await fetch(c.url, { signal: AbortSignal.timeout(60_000) });
+        await fetch(internalUrl(c.port), { signal: AbortSignal.timeout(60_000) });
       } catch (_) {}
       claimedWarm.add(c.id);
+      routes.set(shortId(c.id), c.port); // subdomain routing бүртгэл
       scheduleTTL(c.id, ttlMs);
-      return { id: c.id, url: c.url, warm: true };
+      return { id: c.id, url: publicUrl(c.id, c.port), warm: true };
     } catch (e) {
       await stopPreview(c.id).catch(() => {});
       throw e;
@@ -363,7 +410,8 @@ async function createPreview(files, mode = "static", ttlMs) {
   }
 
   await container.start();
-  const url = await urlOf(container);
+  const port = await portOf(container);
+  routes.set(shortId(container.id), port); // subdomain routing бүртгэл
 
   // 🔒 дүрэм #2: TTL — идэвхгүй байвал устгана (keepalive-аар сунгаж болно)
   scheduleTTL(container.id, ttlMs);
@@ -371,14 +419,14 @@ async function createPreview(files, mode = "static", ttlMs) {
   // Next.js асч дуустал хүлээнэ (static бол шууд бэлэн)
   if (isApp) {
     try {
-      await waitForReady(url);
+      await waitForReady(internalUrl(port));
     } catch (e) {
       await stopPreview(container.id);
       throw e;
     }
   }
 
-  return { id: container.id, url, warm: false };
+  return { id: container.id, url: publicUrl(container.id, port), warm: false };
 }
 
 // Ажиллаж буй бүх preview-г жагсаана
@@ -396,7 +444,7 @@ async function listPreviews() {
       const p = (c.Ports || []).find((x) => x.PublicPort);
       return {
         id: c.Id,
-        url: p ? `http://${PUBLIC_HOST}:${p.PublicPort}` : null,
+        url: p ? publicUrl(c.Id, p.PublicPort) : null,
         state: c.State,
       };
     });
@@ -410,6 +458,7 @@ async function stopPreview(id) {
     timers.delete(id);
   }
   claimedWarm.delete(id);
+  routes.delete(shortId(id)); // subdomain routing бүртгэлээс хасна
   const container = docker.getContainer(id);
   // AutoRemove идэвхтэй тул stop хийхэд өөрөө устана.
   try {
@@ -420,4 +469,15 @@ async function stopPreview(id) {
   } catch (_) {}
 }
 
-module.exports = { init, createPreview, listPreviews, stopPreview, keepAlive };
+module.exports = {
+  init,
+  createPreview,
+  listPreviews,
+  stopPreview,
+  keepAlive,
+  // subdomain routing (server.js proxy ашиглана)
+  resolvePort,
+  isPreviewHost,
+  PREVIEW_DOMAIN,
+  DOMAIN_MODE,
+};

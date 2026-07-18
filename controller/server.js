@@ -1,14 +1,29 @@
 // server.js — Kodu Sandbox Controller-ийн HTTP серверийн хэсэг.
-// Хяналтын самбар (browser) + API-г ажиллуулна.
+// 3 үүрэг:
+//   1) Хяналтын самбар (browser UI) + API — суурь домэйн / localhost дээр
+//   2) Preview subdomain routing — <id>.<PREVIEW_DOMAIN> → зөв контейнер (proxy)
+//   3) Caddy on-demand TLS "ask" endpoint
 //
-// API нь ТҮЛХҮҮРЭЭР хамгаалагдсан (architecture.md): Kodu Sandbox бол тусдаа
-// үйлчилгээ тул зөвхөн түлхүүр мэддэг client (жишээ нь KoDu) л дуудаж чадна.
+// API нь ТҮЛХҮҮРЭЭР хамгаалагдсан (architecture.md): зөвхөн түлхүүр мэддэг
+// client (жишээ нь KoDu) л дуудна.
 
+const http = require("http");
 const express = require("express");
 const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
-const { init, createPreview, listPreviews, stopPreview, keepAlive } = require("./sandbox");
+const httpProxy = require("http-proxy");
+const {
+  init,
+  createPreview,
+  listPreviews,
+  stopPreview,
+  keepAlive,
+  resolvePort,
+  isPreviewHost,
+  PREVIEW_DOMAIN,
+  DOMAIN_MODE,
+} = require("./sandbox");
 
 // POST body-гийн ttl (минут) → миллисекунд. Буруу/хоосон бол undefined.
 function ttlFromBody(body) {
@@ -17,9 +32,6 @@ function ttlFromBody(body) {
 }
 
 // ── API түлхүүр ──────────────────────────────────────────────────────────
-// Дараалал: 1) KODU_SANDBOX_KEY орчны хувьсагч, 2) .kodu-key файл,
-// 3) аль нь ч байхгүй бол шинээр үүсгэж .kodu-key-д хадгална.
-// .kodu-key нь .gitignore-д орсон — түлхүүр GitHub руу ХЭЗЭЭ Ч гарахгүй.
 const KEY_FILE = path.join(__dirname, ".kodu-key");
 
 function loadApiKey() {
@@ -35,22 +47,69 @@ function loadApiKey() {
 
 const API_KEY = loadApiKey();
 
-// Хугацааны халдлагаас хамгаалсан харьцуулалт
 function keysEqual(a, b) {
   const ba = Buffer.from(String(a));
   const bb = Buffer.from(String(b));
   return ba.length === bb.length && crypto.timingSafeEqual(ba, bb);
 }
 
+// ── Preview subdomain proxy ────────────────────────────────────────────────
+// <id>.<PREVIEW_DOMAIN> хүсэлтийг зөв контейнер руу дамжуулна.
+const proxy = httpProxy.createProxyServer({ xfwd: true, ws: true });
+proxy.on("error", (err, req, res) => {
+  console.error("proxy алдаа:", err.code || "", err.message, "→", req && req.headers && req.headers.host);
+  try {
+    if (res.writeHead) {
+      res.writeHead(502, { "Content-Type": "text/plain; charset=utf-8" });
+      res.end("Preview бэлэн биш эсвэл дууссан байна.");
+    } else if (res.destroy) {
+      res.destroy(); // socket (ws)
+    }
+  } catch (_) {}
+});
+
+// Хүсэлтийн Host-оос preview target олно.
+// null → суурь домэйн/localhost (dashboard/API). "notfound" → буруу subdomain.
+function previewTarget(req) {
+  if (!DOMAIN_MODE) return null;
+  const host = (req.headers.host || "").split(":")[0].toLowerCase();
+  if (host === PREVIEW_DOMAIN) return null; // суурь домэйн → dashboard/API
+  const suffix = "." + PREVIEW_DOMAIN;
+  if (!host.endsWith(suffix)) return null; // localhost г.м → dashboard/API
+  const sub = host.slice(0, -suffix.length);
+  const port = resolvePort(sub);
+  return port ? `http://127.0.0.1:${port}` : "notfound";
+}
+
 const app = express();
-app.set("trust proxy", 1); // reverse proxy (Caddy) ард байвал жинхэнэ IP-г уншина
+app.set("trust proxy", 1);
+
+// ⚠️ Proxy нь body-parser-аас ӨМНӨ ажиллана — preview рүү явах хүсэлтийн
+// биеийг controller уншиж авахгүй (POST/upload шууд preview-д хүрнэ).
+app.use((req, res, next) => {
+  const target = previewTarget(req);
+  if (target === null) return next(); // dashboard/API
+  if (target === "notfound") {
+    res.status(404).send("Preview олдсонгүй эсвэл дууссан байна.");
+    return;
+  }
+  // agent:false — холболт бүрийг шинээр (keep-alive quirk-ээс сэргийлнэ)
+  proxy.web(req, res, { target, agent: false });
+});
+
 app.use(express.json({ limit: "5mb" }));
 
-// 🔒 Энгийн rate limit — IP тус бүр цонхонд N хүсэлт. Санах ойд, гуравдагч
-// сан хэрэггүй. Хортой хэн нэг олон хүсэлтээр серверийг дарахаас хамгаална.
-const RATE_WINDOW_MS = 60_000; // 1 минут
-const RATE_MAX = parseInt(process.env.RATE_MAX || "30", 10); // IP-д минутад 30 хүсэлт
-const hits = new Map(); // ip -> [timestamps]
+// Caddy on-demand TLS ask: зөвхөн бодит preview subdomain / суурь домэйнд
+// гэрчилгээ олгоно (санамсаргүй subdomain-аар гэрчилгээ асуухаас сэргийлнэ).
+app.get("/__caddy_ask", (req, res) => {
+  const domain = String(req.query.domain || "");
+  return isPreviewHost(domain) ? res.status(200).send("ok") : res.status(403).send("no");
+});
+
+// ── Rate limit ─────────────────────────────────────────────────────────────
+const RATE_WINDOW_MS = 60_000;
+const RATE_MAX = parseInt(process.env.RATE_MAX || "30", 10);
+const hits = new Map();
 function rateLimit(req, res, next) {
   const ip = req.ip || "unknown";
   const now = Date.now();
@@ -62,7 +121,6 @@ function rateLimit(req, res, next) {
   }
   next();
 }
-// Санах ой хуримтлагдахаас сэргийлж хуучин бүртгэлийг цэвэрлэнэ
 setInterval(() => {
   const now = Date.now();
   for (const [ip, arr] of hits) {
@@ -72,12 +130,11 @@ setInterval(() => {
   }
 }, RATE_WINDOW_MS).unref();
 
-// Хяналтын самбар (нүүр хуудас) — түлхүүр шаардахгүй, харин API нь шаардана
+// ── Dashboard + API (суурь домэйн / localhost) ──────────────────────────────
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// 🔒 /api/* бүх зам эхлээд rate limit, дараа нь түлхүүр шаардана
 app.use("/api", rateLimit);
 app.use("/api", (req, res, next) => {
   const auth = req.headers.authorization || "";
@@ -88,10 +145,6 @@ app.use("/api", (req, res, next) => {
   });
 });
 
-// Шинэ preview үүсгэх.
-// M2:   { files: [{path, content}, ...] } — static сайт
-// M2.5: { files: [...], mode: "app" } — Next.js апп (template image хэрэгтэй)
-// M1-тэй нийцтэй: { html: "..." } өгвөл ганц index.html гэж үзнэ.
 app.post("/api/previews", async (req, res) => {
   try {
     const result = await createPreview(
@@ -106,8 +159,6 @@ app.post("/api/previews", async (req, res) => {
   }
 });
 
-// ⏱️ keepalive — preview-ийн устах цагийг хойшлуулна (ашиглаж байгаа тул амьд байлга).
-// KoDu-гийн preview iframe үүнийг тогтмол (жишээ 5 мин тутам) дуудна.
 app.post("/api/previews/:id/keepalive", async (req, res) => {
   try {
     const ok = await keepAlive(req.params.id, ttlFromBody(req.body));
@@ -118,7 +169,6 @@ app.post("/api/previews/:id/keepalive", async (req, res) => {
   }
 });
 
-// Ажиллаж буй preview-уудыг жагсаах
 app.get("/api/previews", async (req, res) => {
   try {
     res.json(await listPreviews());
@@ -127,7 +177,6 @@ app.get("/api/previews", async (req, res) => {
   }
 });
 
-// Preview зогсоох/устгах
 app.delete("/api/previews/:id", async (req, res) => {
   try {
     await stopPreview(req.params.id);
@@ -137,12 +186,24 @@ app.delete("/api/previews/:id", async (req, res) => {
   }
 });
 
+// ── Сервер (websocket upgrade-ийг гараар барина — Next.js HMR) ───────────────
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => {
+const server = http.createServer(app);
+
+server.on("upgrade", (req, socket, head) => {
+  const target = previewTarget(req);
+  if (target && target !== "notfound") {
+    proxy.ws(req, socket, head, { target });
+  } else {
+    socket.destroy();
+  }
+});
+
+server.listen(PORT, () => {
   console.log("\n  🐳 Kodu Sandbox Controller аслаа");
   console.log(`  → http://localhost:${PORT}`);
+  if (DOMAIN_MODE) console.log(`  🌐 Preview домэйн: *.${PREVIEW_DOMAIN}`);
   console.log(`  🔑 API түлхүүр: ${API_KEY}`);
   console.log("     (самбар нээхэд энэ түлхүүрийг асуувал үүнийг хуулж өгнө)\n");
-  // Цэвэрлэгээ + сүлжээ + дулаан pool-ыг ард нь эхлүүлнэ
   init().catch((e) => console.error("init алдаа:", e.message));
 });

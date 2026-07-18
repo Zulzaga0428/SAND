@@ -158,6 +158,30 @@
 
 ---
 
+## ✅ Өдөр 3 — ⏱️ Уян TTL/keepalive + 🌐 HTTPS subdomain routing (M3)
+
+- ✅ **Уян TTL + keepalive:** preview идэвхгүй байвал (default 15 мин) устана,
+  keepalive хийвэл цаг 0-оос дахин тоолно — ашиглаж байвал амьд.
+  `KODU_TTL_MIN` env, per-request `ttlMin`, дээд хязгаар 8 цаг.
+  `POST /api/previews/:id/keepalive` endpoint. Локалд туршиж баталсан (Тест A ✅).
+- ✅ **HTTPS subdomain routing (M3):** preview URL нь `http://IP:port` биш
+  **`https://<id>.<домэйн>`** болно (E2B шиг).
+  - DNS: `prw.hisainuu.online` + `*.prw.hisainuu.online` → VPS IP (wildcard баталсан)
+  - Controller дотор http-proxy: `<id>.домэйн` → зөв контейнер (Host-based routing)
+  - Контейнер порт зөвхөн `127.0.0.1`-д (гаднаас шууд хүрэхгүй, зөвхөн proxy-гоор)
+  - `deploy/https.sh`: Caddy суулгаж, on-demand TLS (Let's Encrypt), Caddyfile,
+    PREVIEW_DOMAIN тохируулна
+  - **Локалд бүрэн туршиж баталсан** (Host header дуурайлган):
+    static ✅ / Next.js app ✅ proxy-гоор ажиллав, ask endpoint 200/403 зөв
+  - Шийдсэн: static минимал сервер http-proxy keep-alive-тай ECONNRESET өгч
+    байсныг `agent:false`-ээр зассан
+- ⬜ **VPS дээр ажиллуулах үлдсэн:** `git pull` → `bash deploy/https.sh prw.hisainuu.online`
+
+**Энэ алхмаар шийдэгдэх зүйлс:** HTTPS ✅ (iframe mixed-content блок арилна) +
+цэвэр URL ✅ + preview тус бүр тусдаа origin ✅ + desktop redirect quirk ✅
+
+---
+
 ## ✅ Өдөр 3 — ⏱️ Уян хатан TTL + keepalive (2026-07-18)
 
 > Асуулт: "sandbox 15 минутаас урт амьдрахгүй юу?" → Уян хатан болголоо.
