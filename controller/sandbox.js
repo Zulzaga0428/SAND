@@ -23,7 +23,11 @@ const docker =
 const IMAGE = "node:20-alpine"; // static горим: жижиг, хурдан image
 const IMAGE_APP = "kodu-template-next"; // app горим: node_modules бэлэн Next.js template
 const INTERNAL_PORT = "3000/tcp"; // контейнер доторх вэб серверийн порт
-const TTL_MS = 15 * 60 * 1000; // 15 мин дараа автоматаар устна
+// ⏱️ TTL (амьдрах хугацаа). Идэвхгүй байх энэ хугацааны дараа устана.
+// keepalive хийвэл дахин 0-оос тоолж эхэлнэ (ашиглаж байвал амьд).
+// KODU_TTL_MIN env-ээр өөрчилнө (default 15 мин). Аюулгүйн дээд хязгаар: 8 цаг.
+const TTL_MS = parseFloat(process.env.KODU_TTL_MIN || "15") * 60 * 1000;
+const MAX_TTL_MS = 8 * 60 * 60 * 1000; // 8 цаг — нэг preview үүнээс урт амьдрахгүй
 const WARM_POOL_SIZE = parseInt(process.env.WARM_POOL_SIZE || "1", 10);
 const NETWORK = "kodu-sandbox-net"; // тусгаарлагдсан сүлжээ
 // Контейнерт өгөх CPU. Сервер цөөн цөмтэй бол (жишээ 1 vCPU VPS) энэ хэтрэхгүй
@@ -265,10 +269,34 @@ async function init() {
   warmUp(); // pool-ыг ард нь дүүргэж эхэлнэ (хүлээхгүй)
 }
 
+// ── ⏱️ TTL удирдлага ──────────────────────────────────────────────────────
+// Preview-д "устах цаг" тавина. keepalive хийвэл цагийг 0-оос дахин тоолно.
+// ttlMs өгвөл түүнийг (MAX_TTL_MS-ээс хэтрэхгүйгээр) ашиглана, үгүй бол default.
+function scheduleTTL(id, ttlMs) {
+  const ms = Math.min(ttlMs || TTL_MS, MAX_TTL_MS);
+  const old = timers.get(id);
+  if (old) clearTimeout(old);
+  const t = setTimeout(() => stopPreview(id).catch(() => {}), ms);
+  if (t.unref) t.unref(); // таймер процессыг амьд байлгахгүй
+  timers.set(id, t);
+}
+
+// keepalive: preview-ийн устах цагийг хойшлуулна (ашиглаж байгаа тул амьд байлга).
+// Тухайн preview байхгүй бол false буцаана.
+async function keepAlive(id, ttlMs) {
+  const containers = await docker.listContainers({
+    filters: { label: ["kodu.sandbox"] },
+  });
+  const found = containers.find((c) => c.Id === id || c.Id.startsWith(id));
+  if (!found) return false;
+  scheduleTTL(found.Id, ttlMs);
+  return true;
+}
+
 // ── Preview үүсгэх ────────────────────────────────────────────────────────
 // files = төслийн файлууд [{path, content}] (string бол ганц index.html).
 // mode  = "static" (HTML/CSS/JS) эсвэл "app" (Next.js).
-async function createPreview(files, mode = "static") {
+async function createPreview(files, mode = "static", ttlMs) {
   const isApp = mode === "app";
 
   if (typeof files === "string") {
@@ -298,8 +326,7 @@ async function createPreview(files, mode = "static") {
         await fetch(c.url, { signal: AbortSignal.timeout(60_000) });
       } catch (_) {}
       claimedWarm.add(c.id);
-      const t = setTimeout(() => stopPreview(c.id).catch(() => {}), TTL_MS);
-      timers.set(c.id, t);
+      scheduleTTL(c.id, ttlMs);
       return { id: c.id, url: c.url, warm: true };
     } catch (e) {
       await stopPreview(c.id).catch(() => {});
@@ -338,9 +365,8 @@ async function createPreview(files, mode = "static") {
   await container.start();
   const url = await urlOf(container);
 
-  // 🔒 дүрэм #2: TTL — 15 мин дараа автоматаар устгана
-  const t = setTimeout(() => stopPreview(container.id).catch(() => {}), TTL_MS);
-  timers.set(container.id, t);
+  // 🔒 дүрэм #2: TTL — идэвхгүй байвал устгана (keepalive-аар сунгаж болно)
+  scheduleTTL(container.id, ttlMs);
 
   // Next.js асч дуустал хүлээнэ (static бол шууд бэлэн)
   if (isApp) {
@@ -394,4 +420,4 @@ async function stopPreview(id) {
   } catch (_) {}
 }
 
-module.exports = { init, createPreview, listPreviews, stopPreview };
+module.exports = { init, createPreview, listPreviews, stopPreview, keepAlive };

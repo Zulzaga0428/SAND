@@ -8,7 +8,13 @@ const express = require("express");
 const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
-const { init, createPreview, listPreviews, stopPreview } = require("./sandbox");
+const { init, createPreview, listPreviews, stopPreview, keepAlive } = require("./sandbox");
+
+// POST body-гийн ttl (минут) → миллисекунд. Буруу/хоосон бол undefined.
+function ttlFromBody(body) {
+  const min = parseFloat(body && body.ttlMin);
+  return Number.isFinite(min) && min > 0 ? min * 60 * 1000 : undefined;
+}
 
 // ── API түлхүүр ──────────────────────────────────────────────────────────
 // Дараалал: 1) KODU_SANDBOX_KEY орчны хувьсагч, 2) .kodu-key файл,
@@ -90,11 +96,24 @@ app.post("/api/previews", async (req, res) => {
   try {
     const result = await createPreview(
       req.body.files || req.body.html,
-      req.body.mode || "static"
+      req.body.mode || "static",
+      ttlFromBody(req.body)
     );
     res.json(result);
   } catch (e) {
     console.error("createPreview алдаа:", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ⏱️ keepalive — preview-ийн устах цагийг хойшлуулна (ашиглаж байгаа тул амьд байлга).
+// KoDu-гийн preview iframe үүнийг тогтмол (жишээ 5 мин тутам) дуудна.
+app.post("/api/previews/:id/keepalive", async (req, res) => {
+  try {
+    const ok = await keepAlive(req.params.id, ttlFromBody(req.body));
+    if (!ok) return res.status(404).json({ error: "Preview олдсонгүй" });
+    res.json({ ok: true });
+  } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
