@@ -182,6 +182,23 @@
 
 ---
 
+## 🔵 Өдөр 3 (үргэлжлэл) — M5 client адаптер + shadow-тест (хийгдэж байна)
+
+- ✅ **`client/index.js`** — SAND API client (KoDuSandbox class). E2B-тэй
+  ойролцоо интерфейс: createPreview / keepAlive / stopPreview / list /
+  createAndWait. Node 18+ fetch, гуравдагч сан хэрэггүй. Синтакс шалгасан.
+- ✅ **`client/shadow-test.js`** — SAND зөв ажиллаж байгааг батлах harness:
+  static + app preview үүсгэж, агуулга зөв, keepAlive/list/stop шалгана.
+  `SAND_URL=... SAND_KEY=... node client/shadow-test.js`
+- ⬜ **VPS дээр shadow-тест ажиллуулж батлах** (жинхэнэ орчин)
+- ⬜ **Landing засах + API-г албажуулах** (API docs / түлхүүр өгөх урсгал)
+- ⬜ Дараа нь: HTTPS асаах → KoDu-APP-д client холбох
+
+> Тэмдэглэл: local Docker Desktop өнөөдөр удаж байсан тул client-ийг локалд бус
+> **VPS дээр** батлах нь илүү утга учиртай (жинхэнэ орчин).
+
+---
+
 ## ✅ Өдөр 3 — ⏱️ Уян хатан TTL + keepalive (2026-07-18)
 
 > Асуулт: "sandbox 15 минутаас урт амьдрахгүй юу?" → Уян хатан болголоо.

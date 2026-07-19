@@ -42,7 +42,9 @@ sand/
 │   ├── progress.md        ← явцын тэмдэглэл (өдөр бүр)
 │   └── week-1-docker.md   ← Өдөр 1–7: Docker сурах гарын авлага
 ├── controller/            ← sandbox цөм: API + dockerode (README дотор нь)
+├── client/                ← SAND API client (адаптер) + shadow-тест (M5)
 ├── template/              ← Next.js template image (Dockerfile)
+├── deploy/                ← VPS суулгах, HTTPS (Caddy), хамгаалалтын скриптүүд
 └── landing/               ← танилцуулга сайт (Railway дээр амьд)
 ```
 
