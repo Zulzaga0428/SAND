@@ -199,6 +199,28 @@
 
 ---
 
+## ✅ Өдөр 3 (үргэлжлэл) — 📱 Expo/react-native-web template (app.kodu.live-д)
+
+App agent-ийн нарийн хүсэлт + туршсан жороор:
+
+- ✅ **`template-expo/`** — Vite + react-native-web (App agent-ийн баталсан жор).
+  Хэрэглэгч `src/App.tsx` илгээнэ, "react-native"-ээс import → RNW руу alias.
+  **`Alert.alert` polyfill** (browser alert/confirm) — RNW-д ажилладаггүйг зассан.
+- ✅ **`mode: "expo"`** controller-т: IMAGE_EXPO, 768MB, dev server бэлэн болтол хүлээнэ.
+- ✅ **Hot-reload:** `PUT /api/previews/:id/files` — засвар бүрт шинэ контейнер
+  асаахгүй, файл дарж бичээд Vite HMR. `updateFiles` + `previewMode`.
+- ✅ **Proxy `changeOrigin`** — Vite-ийн host-шалгалтыг давуулна (subdomain routing).
+- ✅ **`docs/api.md`** — App agent-ийн бүх асуултын хариу.
+- ✅ **Локалд бүрэн туршиж баталсан:**
+  - Expo preview үүсэв (Vite dev server) → proxy-гоор index.html + App.tsx
+    үйлчилж байна (RNW alias + JSX transform зөв)
+  - Hot-reload PASS: PUT-аар шинэ код контейнерт орлоо (шинэ контейнер асаагаагүй)
+  - Устгал цэвэрхэн
+- ⬜ **VPS дээр:** `git pull` → `docker build -t kodu-template-expo template-expo`
+  → `bash deploy/https.sh prw.hisainuu.online` → restart
+
+---
+
 ## ✅ Өдөр 3 — ⏱️ Уян хатан TTL + keepalive (2026-07-18)
 
 > Асуулт: "sandbox 15 минутаас урт амьдрахгүй юу?" → Уян хатан болголоо.
