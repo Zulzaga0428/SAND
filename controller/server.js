@@ -16,6 +16,7 @@ const httpProxy = require("http-proxy");
 const {
   init,
   createPreview,
+  updateFiles,
   listPreviews,
   stopPreview,
   keepAlive,
@@ -55,7 +56,9 @@ function keysEqual(a, b) {
 
 // ── Preview subdomain proxy ────────────────────────────────────────────────
 // <id>.<PREVIEW_DOMAIN> хүсэлтийг зөв контейнер руу дамжуулна.
-const proxy = httpProxy.createProxyServer({ xfwd: true, ws: true });
+// changeOrigin: контейнерт Host-ыг 127.0.0.1 болгож дамжуулна — Vite/Next dev
+// серверийн Host-шалгалт (allowedHosts) саад болохгүй.
+const proxy = httpProxy.createProxyServer({ xfwd: true, ws: true, changeOrigin: true });
 proxy.on("error", (err, req, res) => {
   console.error("proxy алдаа:", err.code || "", err.message, "→", req && req.headers && req.headers.host);
   try {
@@ -186,6 +189,18 @@ app.post("/api/previews", async (req, res) => {
 app.post("/api/previews/:id/keepalive", async (req, res) => {
   try {
     const ok = await keepAlive(req.params.id, ttlFromBody(req.body));
+    if (!ok) return res.status(404).json({ error: "Preview олдсонгүй" });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Ажиллаж буй preview-ийн файлыг шинэчлэх (hot reload — шинэ контейнер асаахгүй).
+// Засварласан кодыг { files: [...] }-ээр илгээнэ → HMR/reload хийнэ.
+app.put("/api/previews/:id/files", async (req, res) => {
+  try {
+    const ok = await updateFiles(req.params.id, req.body.files);
     if (!ok) return res.status(404).json({ error: "Preview олдсонгүй" });
     res.json({ ok: true });
   } catch (e) {

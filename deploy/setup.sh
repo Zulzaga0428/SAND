@@ -35,8 +35,9 @@ else
   git clone https://github.com/Zulzaga0428/SAND.git /opt/kodu-sandbox
 fi
 
-echo "=== [4/6] Next.js template image build хийж байна (хэдэн минут)..."
+echo "=== [4/6] Template image-ууд build хийж байна (хэдэн минут)..."
 docker build -t kodu-template-next /opt/kodu-sandbox/template
+docker build -t kodu-template-expo /opt/kodu-sandbox/template-expo
 
 echo "=== [5/6] Controller тохируулж байна..."
 cd /opt/kodu-sandbox/controller

@@ -60,7 +60,7 @@ class KoduSandbox {
   /**
    * Preview үүсгэнэ.
    * @param {Array<{path:string,content:string}>} files - төслийн файлууд
-   * @param {{mode?: "static"|"app", ttlMin?: number}} [opts]
+   * @param {{mode?: "static"|"app"|"expo", ttlMin?: number}} [opts]
    * @returns {Promise<{id:string, url:string, warm:boolean}>}
    */
   createPreview(files, opts = {}) {
@@ -69,6 +69,11 @@ class KoduSandbox {
       mode: opts.mode || "static",
       ttlMin: opts.ttlMin,
     });
+  }
+
+  /** Ажиллаж буй preview-ийн файлыг шинэчилнэ (hot reload — шинэ preview үүсгэхгүй). */
+  updateFiles(id, files) {
+    return this._req("PUT", `/api/previews/${encodeURIComponent(id)}/files`, { files });
   }
 
   /** Preview-ийн устах цагийг сунгана (ашиглаж байгаа цагт тогтмол дуудна). */

@@ -22,6 +22,7 @@ const docker =
 
 const IMAGE = "node:20-alpine"; // static горим: жижиг, хурдан image
 const IMAGE_APP = "kodu-template-next"; // app горим: node_modules бэлэн Next.js template
+const IMAGE_EXPO = "kodu-template-expo"; // expo горим: react-native-web (Vite) template
 const INTERNAL_PORT = "3000/tcp"; // контейнер доторх вэб серверийн порт
 // ⏱️ TTL (амьдрах хугацаа). Идэвхгүй байх энэ хугацааны дараа устана.
 // keepalive хийвэл дахин 0-оос тоолж эхэлнэ (ашиглаж байвал амьд).
@@ -33,6 +34,7 @@ const NETWORK = "kodu-sandbox-net"; // тусгаарлагдсан сүлжээ
 // Контейнерт өгөх CPU. Сервер цөөн цөмтэй бол (жишээ 1 vCPU VPS) энэ хэтрэхгүй
 // байх ёстой. Хэрэгцээгээр нь тохируулна: KODU_APP_CPUS / KODU_STATIC_CPUS.
 const CPUS_APP = parseFloat(process.env.KODU_APP_CPUS || "1");
+const CPUS_EXPO = parseFloat(process.env.KODU_EXPO_CPUS || "1");
 const CPUS_STATIC = parseFloat(process.env.KODU_STATIC_CPUS || "0.5");
 // Preview URL-д хэрэглэх хаяг: локалд "localhost", VPS дээр нийтийн IP/домэйн
 // (setup.sh скрипт үүнийг серверийн IP-гээр автоматаар тохируулдаг)
@@ -50,6 +52,8 @@ const timers = new Map();
 // 🌐 subdomain routing: shortId(12) -> host port. Домэйн горимд proxy
 // <shortid>.<PREVIEW_DOMAIN> хүсэлтийг зөв контейнер руу чиглүүлэхэд ашиглана.
 const routes = new Map();
+// containerId -> mode ("static"|"app"|"expo") — updateFiles зөв замд бичихэд
+const previewMode = new Map();
 const shortId = (id) => id.slice(0, 12);
 // ♨️ Дулаан pool: урьдчилан асаасан, хэрэглэгч хүлээж буй Next.js контейнерууд
 const warmPool = []; // [{ id, port }]
@@ -94,6 +98,17 @@ async function ensureAppImage() {
   if (!images.length) {
     throw new Error(
       `'${IMAGE_APP}' image алга. Эхлээд build хий: cd template && docker build -t ${IMAGE_APP} .`
+    );
+  }
+}
+
+async function ensureExpoImage() {
+  const images = await docker.listImages({
+    filters: { reference: [IMAGE_EXPO] },
+  });
+  if (!images.length) {
+    throw new Error(
+      `'${IMAGE_EXPO}' image алга. Эхлээд build хий: cd template-expo && docker build -t ${IMAGE_EXPO} .`
     );
   }
 }
@@ -193,7 +208,12 @@ async function waitForReady(url, timeoutMs = 90_000) {
 }
 
 // ── Контейнер үүсгэх суурь тохиргоо ──────────────────────────────────────
-function hostConfig(isApp) {
+// mode: "static" | "app" (Next.js) | "expo" (react-native-web)
+function hostConfig(mode) {
+  // 🔒 дүрэм #4: нөөцийн хязгаар. dev-server (Next.js/Vite) илүү RAM иддэг.
+  const mem = mode === "app" ? 1024 : mode === "expo" ? 768 : 512;
+  const cpus =
+    mode === "app" ? CPUS_APP : mode === "expo" ? CPUS_EXPO : CPUS_STATIC;
   return {
     // Docker чөлөөт порт өөрөө сонгоно (HostPort хоосон).
     // 🔒 Домэйн горимд зөвхөн 127.0.0.1-д нээнэ — preview-д гаднаас шууд
@@ -201,11 +221,9 @@ function hostConfig(isApp) {
     PortBindings: {
       [INTERNAL_PORT]: [{ HostIp: DOMAIN_MODE ? "127.0.0.1" : "", HostPort: "" }],
     },
-    // 🔒 дүрэм #4: нөөцийн хязгаар. Next.js dev server илүү их RAM иддэг.
-    // CPU нь серверийн бодит цөмийн тооноос хэтрэхгүй (VPS ихэвчлэн 1 vCPU).
-    Memory: (isApp ? 1024 : 512) * 1024 * 1024,
-    MemorySwap: (isApp ? 1024 : 512) * 1024 * 1024, // swap нэмэхгүй (RAM=нийт хязгаар)
-    NanoCpus: Math.round((isApp ? CPUS_APP : CPUS_STATIC) * 1_000_000_000),
+    Memory: mem * 1024 * 1024,
+    MemorySwap: mem * 1024 * 1024, // swap нэмэхгүй (RAM=нийт хязгаар)
+    NanoCpus: Math.round(cpus * 1_000_000_000),
     PidsLimit: 256,
     AutoRemove: true, // 🔒 дүрэм #2: зогсмогц устана (ephemeral)
     NetworkMode: NETWORK, // 🔒 тусгаарлагдсан сүлжээ (контейнер хооронд icc=false)
@@ -260,7 +278,7 @@ async function startWarmContainer() {
   const container = await docker.createContainer({
     Image: IMAGE_APP,
     ExposedPorts: { [INTERNAL_PORT]: {} },
-    HostConfig: hostConfig(true),
+    HostConfig: hostConfig("app"),
     Labels: { "kodu.sandbox": "warm" },
   });
   await container.start();
@@ -310,6 +328,7 @@ async function init() {
     console.log(`  🧹 Өмнөх ажиллагааны ${stale.length} контейнер цэвэрлэлээ`);
   }
   routes.clear();
+  previewMode.clear();
   warmPool.length = 0;
   claimedWarm.clear();
   warmUp(); // pool-ыг ард нь дүүргэж эхэлнэ (хүлээхгүй)
@@ -341,15 +360,17 @@ async function keepAlive(id, ttlMs) {
 
 // ── Preview үүсгэх ────────────────────────────────────────────────────────
 // files = төслийн файлууд [{path, content}] (string бол ганц index.html).
-// mode  = "static" (HTML/CSS/JS) эсвэл "app" (Next.js).
+// mode  = "static" (HTML/CSS/JS) | "app" (Next.js) | "expo" (react-native-web)
 async function createPreview(files, mode = "static", ttlMs) {
   const isApp = mode === "app";
+  const isExpo = mode === "expo";
+  const isServer = isApp || isExpo; // dev-server суурьтай (Next.js / Vite)
 
   if (typeof files === "string") {
     files = [{ path: "index.html", content: files }];
   }
   if (!Array.isArray(files) || !files.length) {
-    files = isApp
+    files = isServer
       ? []
       : [{ path: "index.html", content: "<h1>Сайн уу, Kodu Sandbox! 🐳</h1>" }];
   }
@@ -373,6 +394,7 @@ async function createPreview(files, mode = "static", ttlMs) {
       } catch (_) {}
       claimedWarm.add(c.id);
       routes.set(shortId(c.id), c.port); // subdomain routing бүртгэл
+      previewMode.set(c.id, "app");
       scheduleTTL(c.id, ttlMs);
       return { id: c.id, url: publicUrl(c.id, c.port), warm: true };
     } catch (e) {
@@ -381,26 +403,27 @@ async function createPreview(files, mode = "static", ttlMs) {
     }
   }
 
-  // Удаан зам: шинээр асаана (pool хоосон эсвэл static горим)
-  if (isApp) {
-    await ensureAppImage();
-  } else {
-    await ensureImage();
-  }
+  // Удаан зам: шинээр асаана (pool хоосон / static / expo)
+  const image = isApp ? IMAGE_APP : isExpo ? IMAGE_EXPO : IMAGE;
+  if (isApp) await ensureAppImage();
+  else if (isExpo) await ensureExpoImage();
+  else await ensureImage();
 
   const container = await docker.createContainer({
-    Image: isApp ? IMAGE_APP : IMAGE,
-    // app горимд template image-ийн CMD (npm run dev) өөрөө ажиллана
-    ...(isApp ? {} : { Cmd: ["node", "-e", SERVER_SCRIPT], User: "node" }),
+    Image: image,
+    // Server горимд (Next.js/Expo) template image-ийн CMD (dev server) өөрөө
+    // ажиллана. Static горимд л жижиг node серверийг гараар өгнө.
+    ...(isServer ? {} : { Cmd: ["node", "-e", SERVER_SCRIPT], User: "node" }),
     ExposedPorts: { [INTERNAL_PORT]: {} },
-    HostConfig: hostConfig(isApp),
+    HostConfig: hostConfig(mode),
     Labels: { "kodu.sandbox": "preview" },
   });
 
   // Файлуудыг tar болгоод контейнер руу бичнэ. Асаахаас ӨМНӨ хийнэ.
-  // static: /app дотор; app: /home/node/app дотор (template-ийн файлыг дарна).
+  // server горим: /home/node/app дотор (template-ийн файлыг дарна)
+  // static:       /app дотор
   if (files.length) {
-    if (isApp) {
+    if (isServer) {
       const archive = await filesToTar(files, "");
       await container.putArchive(archive, { path: "/home/node/app" });
     } else {
@@ -412,12 +435,13 @@ async function createPreview(files, mode = "static", ttlMs) {
   await container.start();
   const port = await portOf(container);
   routes.set(shortId(container.id), port); // subdomain routing бүртгэл
+  previewMode.set(container.id, mode);
 
   // 🔒 дүрэм #2: TTL — идэвхгүй байвал устгана (keepalive-аар сунгаж болно)
   scheduleTTL(container.id, ttlMs);
 
-  // Next.js асч дуустал хүлээнэ (static бол шууд бэлэн)
-  if (isApp) {
+  // Dev server (Next.js/Expo) асч дуустал хүлээнэ (static бол шууд бэлэн)
+  if (isServer) {
     try {
       await waitForReady(internalUrl(port));
     } catch (e) {
@@ -427,6 +451,27 @@ async function createPreview(files, mode = "static", ttlMs) {
   }
 
   return { id: container.id, url: publicUrl(container.id, port), warm: false };
+}
+
+// ── Ажиллаж буй preview-ийн файлыг шинэчлэх (hot reload) ─────────────────────
+// Шинээр контейнер асаахгүйгээр байгаа preview-ийн файлуудыг дарж бичнэ.
+// Next.js/Vite dev server өөрчлөлтийг мэдэрч HMR/reload хийнэ.
+async function updateFiles(id, files) {
+  const containers = await docker.listContainers({
+    filters: { label: ["kodu.sandbox"] },
+  });
+  const found = containers.find((c) => c.Id === id || c.Id.startsWith(id));
+  if (!found) return false;
+  if (!Array.isArray(files) || !files.length) return true;
+  validateFiles(files);
+  const mode = previewMode.get(found.Id) || "app";
+  const isServer = mode === "app" || mode === "expo";
+  const archive = await filesToTar(files, isServer ? "" : "app/");
+  await docker
+    .getContainer(found.Id)
+    .putArchive(archive, { path: isServer ? "/home/node/app" : "/" });
+  scheduleTTL(found.Id); // засвар хийсэн тул амьд байлгана
+  return true;
 }
 
 // Ажиллаж буй бүх preview-г жагсаана
@@ -459,6 +504,7 @@ async function stopPreview(id) {
   }
   claimedWarm.delete(id);
   routes.delete(shortId(id)); // subdomain routing бүртгэлээс хасна
+  previewMode.delete(id);
   const container = docker.getContainer(id);
   // AutoRemove идэвхтэй тул stop хийхэд өөрөө устана.
   try {
@@ -472,6 +518,7 @@ async function stopPreview(id) {
 module.exports = {
   init,
   createPreview,
+  updateFiles,
   listPreviews,
   stopPreview,
   keepAlive,

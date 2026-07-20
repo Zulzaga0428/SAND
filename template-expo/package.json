@@ -1,0 +1,18 @@
+{
+  "name": "kodu-template-expo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Kodu Sandbox — Expo / React Native (web) preview template",
+  "scripts": {
+    "dev": "vite"
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-native-web": "0.19.13"
+  },
+  "devDependencies": {
+    "vite": "5.4.11",
+    "@vitejs/plugin-react": "4.3.4"
+  }
+}
