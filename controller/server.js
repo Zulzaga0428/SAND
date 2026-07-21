@@ -22,7 +22,9 @@ const {
   keepAlive,
   resolvePort,
   isPreviewHost,
-  PREVIEW_DOMAIN,
+  parsePreviewHost,
+  PRIMARY_DOMAIN,
+  PREVIEW_DOMAINS,
   DOMAIN_MODE,
 } = require("./sandbox");
 
@@ -71,16 +73,12 @@ proxy.on("error", (err, req, res) => {
   } catch (_) {}
 });
 
-// Хүсэлтийн Host-оос preview target олно.
+// Хүсэлтийн Host-оос preview target олно (олон домэйн дэмжинэ).
 // null → суурь домэйн/localhost (dashboard/API). "notfound" → буруу subdomain.
 function previewTarget(req) {
-  if (!DOMAIN_MODE) return null;
-  const host = (req.headers.host || "").split(":")[0].toLowerCase();
-  if (host === PREVIEW_DOMAIN) return null; // суурь домэйн → dashboard/API
-  const suffix = "." + PREVIEW_DOMAIN;
-  if (!host.endsWith(suffix)) return null; // localhost г.м → dashboard/API
-  const sub = host.slice(0, -suffix.length);
-  const port = resolvePort(sub);
+  const p = parsePreviewHost(req.headers.host);
+  if (!p || !p.sub) return null; // манай домэйн биш эсвэл суурь → dashboard/API
+  const port = resolvePort(p.sub);
   return port ? `http://127.0.0.1:${port}` : "notfound";
 }
 
@@ -241,7 +239,7 @@ server.on("upgrade", (req, socket, head) => {
 server.listen(PORT, () => {
   console.log("\n  🐳 Kodu Sandbox Controller аслаа");
   console.log(`  → http://localhost:${PORT}`);
-  if (DOMAIN_MODE) console.log(`  🌐 Preview домэйн: *.${PREVIEW_DOMAIN}`);
+  if (DOMAIN_MODE) console.log(`  🌐 Preview домэйн(ууд): ${PREVIEW_DOMAINS.map((d) => "*." + d).join(", ")}`);
   console.log(`  🔑 API түлхүүр: ${API_KEY}`);
   console.log("     (самбар нээхэд энэ түлхүүрийг асуувал үүнийг хуулж өгнө)\n");
   init().catch((e) => console.error("init алдаа:", e.message));

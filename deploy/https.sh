@@ -5,15 +5,28 @@
 # Preview-д цэвэр HTTPS хаяг өгнө: https://<id>.<домэйн>
 # Caddy автомат Let's Encrypt гэрчилгээ (on-demand TLS) авна.
 #
-# Урьдчилсан нөхцөл: DNS дээр 2 бичлэг заасан байх ёстой:
+# ОЛОН домэйн дэмжинэ (домэйн шилжилтэд хоёул зэрэг ажиллана):
+#   bash https.sh prw.kodu.live prw.hisainuu.online
+# Эхний домэйн = PRIMARY (шинэ preview URL үүнээр гарна).
+#
+# Урьдчилсан нөхцөл: домэйн БҮР дээр DNS бичлэг заасан байх:
 #   A  <домэйн>     → серверийн IP   (жишээ: prw → 202.182.123.79)
 #   A  *.<домэйн>   → серверийн IP   (wildcard)
-#
-# Ажиллуулах (root):
-#   bash /opt/kodu-sandbox/deploy/https.sh prw.hisainuu.online
 # ============================================================
 set -euo pipefail
-DOMAIN="${1:?Хэрэглээ: bash https.sh <preview-домэйн>  (жишээ: prw.hisainuu.online)}"
+if [ "$#" -lt 1 ]; then
+  echo "Хэрэглээ: bash https.sh <домэйн> [домэйн2 ...]  (жишээ: prw.kodu.live prw.hisainuu.online)"
+  exit 1
+fi
+DOMAINS=("$@")
+PRIMARY="${DOMAINS[0]}"
+# Caddy site нэрс: "d1, *.d1, d2, *.d2"
+SITES=""
+for d in "${DOMAINS[@]}"; do
+  SITES="${SITES:+$SITES, }$d, *.$d"
+done
+# PREVIEW_DOMAIN env: таслалаар (PRIMARY эхэнд)
+CSV="$(IFS=,; echo "${DOMAINS[*]}")"
 
 echo "=== [1/5] Caddy суулгаж байна..."
 if ! command -v caddy &>/dev/null; then
@@ -26,7 +39,7 @@ if ! command -v caddy &>/dev/null; then
   apt-get install -y caddy
 fi
 
-echo "=== [2/5] Caddyfile бичиж байна ($DOMAIN)..."
+echo "=== [2/5] Caddyfile бичиж байна ($SITES)..."
 cat > /etc/caddy/Caddyfile <<EOF
 {
     # on-demand TLS: subdomain болгонд гэрчилгээ хэрэгцээгээр авна.
@@ -36,7 +49,7 @@ cat > /etc/caddy/Caddyfile <<EOF
     }
 }
 
-$DOMAIN, *.$DOMAIN {
+$SITES {
     tls {
         on_demand
     }
@@ -48,7 +61,7 @@ echo "=== [3/5] Controller-д PREVIEW_DOMAIN тохируулж, багц шин
 mkdir -p /etc/systemd/system/kodu-sandbox.service.d
 cat > /etc/systemd/system/kodu-sandbox.service.d/preview-domain.conf <<EOF
 [Service]
-Environment=PREVIEW_DOMAIN=$DOMAIN
+Environment=PREVIEW_DOMAIN=$CSV
 EOF
 # http-proxy зэрэг шинэ багцуудыг суулгана
 (cd /opt/kodu-sandbox/controller && npm install --omit=dev --no-audit --no-fund)
@@ -67,11 +80,11 @@ systemctl restart caddy
 
 echo ""
 echo "============================================================"
-echo "  🔒 HTTPS бэлэн!"
-echo "  Самбар:  https://$DOMAIN"
-echo "  Preview: https://<id>.$DOMAIN  (автоматаар үүснэ)"
+echo "  🔒 HTTPS бэлэн! Домэйн(ууд): $CSV"
+echo "  Самбар:  https://$PRIMARY"
+echo "  Preview: https://<id>.$PRIMARY  (шинэ preview PRIMARY-гаар)"
+echo "  (Бусад домэйн ч зэрэг ажиллана — шилжилтэд preview тасрахгүй)"
 echo ""
-echo "  ⚠️  Эхний удаад гэрчилгээ авахад subdomain бүр 1-2 сек удаана."
-echo "  ⚠️  Let's Encrypt: нэг домэйнд 7 хоногт ~50 шинэ гэрчилгээ (on-demand)."
-echo "     Олон хэрэглэгчтэй бол wildcard гэрчилгээ рүү шилжинэ (docs)."
+echo "  ⚠️  Эхний удаад subdomain бүрд гэрчилгээ авахад 1-2 сек."
+echo "  ⚠️  Let's Encrypt: домэйн бүрд 7 хоногт ~50 шинэ гэрчилгээ (on-demand)."
 echo "============================================================"

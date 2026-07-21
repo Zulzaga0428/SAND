@@ -40,12 +40,18 @@ const CPUS_STATIC = parseFloat(process.env.KODU_STATIC_CPUS || "0.5");
 // (setup.sh скрипт үүнийг серверийн IP-гээр автоматаар тохируулдаг)
 const PUBLIC_HOST = process.env.PUBLIC_HOST || "localhost";
 
-// 🌐 Домэйн горим: PREVIEW_DOMAIN тохируулбал (жишээ "prw.hisainuu.online")
-// preview URL нь https://<id>.<PREVIEW_DOMAIN> болно (Caddy HTTPS + subdomain
-// routing). Контейнерийн порт зөвхөн 127.0.0.1-д нээгдэнэ (гаднаас шууд хүрэхгүй,
-// зөвхөн Caddy → controller proxy-гоор). Тохируулаагүй бол хуучин http://IP:port.
-const PREVIEW_DOMAIN = process.env.PREVIEW_DOMAIN || "";
-const DOMAIN_MODE = !!PREVIEW_DOMAIN;
+// 🌐 Домэйн горим: PREVIEW_DOMAIN тохируулбал preview URL нь
+// https://<id>.<домэйн> болно (Caddy HTTPS + subdomain routing).
+// ОЛОН домэйн дэмжинэ (таслалаар): "prw.kodu.live,prw.hisainuu.online".
+//   - Эхнийх = PRIMARY: шинэ preview URL үүнээр гарна
+//   - Бусад = зэрэг ажиллана (домэйн шилжилтэд preview тасрахгүй)
+// Контейнерийн порт зөвхөн 127.0.0.1-д (гаднаас шууд хүрэхгүй, Caddy → proxy).
+const PREVIEW_DOMAINS = (process.env.PREVIEW_DOMAIN || "")
+  .split(",")
+  .map((s) => s.trim().toLowerCase())
+  .filter(Boolean);
+const PRIMARY_DOMAIN = PREVIEW_DOMAINS[0] || "";
+const DOMAIN_MODE = PREVIEW_DOMAINS.length > 0;
 
 // containerId -> setTimeout (TTL таймер)
 const timers = new Map();
@@ -245,11 +251,11 @@ async function portOf(container) {
 const internalUrl = (port) => `http://127.0.0.1:${port}`;
 
 // Хэрэглэгчид буцаах нийтийн хаяг:
-//   домэйн горим:  https://<shortid>.<PREVIEW_DOMAIN>
+//   домэйн горим:  https://<shortid>.<PRIMARY_DOMAIN>  (шинэ preview PRIMARY-гаар)
 //   энгийн горим:  http://<PUBLIC_HOST>:<port>
 function publicUrl(id, port) {
   return DOMAIN_MODE
-    ? `https://${shortId(id)}.${PREVIEW_DOMAIN}`
+    ? `https://${shortId(id)}.${PRIMARY_DOMAIN}`
     : `http://${PUBLIC_HOST}:${port}`;
 }
 
@@ -257,15 +263,29 @@ function publicUrl(id, port) {
 function resolvePort(sub) {
   return routes.get(sub);
 }
-// Домэйн горимд host зөв preview subdomain эсэхийг шалгана (Caddy on-demand TLS ask)
-function isPreviewHost(host) {
-  if (!DOMAIN_MODE || !host) return false;
+
+// host-ыг preview домэйнуудтай тулгана.
+//   null            → манай домэйн биш (dashboard/localhost)
+//   { base }        → суурь домэйн (жишээ prw.kodu.live) — dashboard/API
+//   { base, sub }   → preview subdomain (<sub>.<base>)
+// Олон домэйн дэмжинэ — аль нэгтэй нь таарвал болно (домэйн шилжилтэд preview
+// хоёр домэйн дээр зэрэг ажиллана).
+function parsePreviewHost(host) {
+  if (!DOMAIN_MODE || !host) return null;
   const h = host.split(":")[0].toLowerCase();
-  if (h === PREVIEW_DOMAIN) return true; // суурь домэйн (dashboard/API)
-  const suffix = "." + PREVIEW_DOMAIN;
-  if (!h.endsWith(suffix)) return false;
-  const sub = h.slice(0, -suffix.length);
-  return routes.has(sub); // зөвхөн бодит preview subdomain-д гэрчилгээ олгоно
+  for (const d of PREVIEW_DOMAINS) {
+    if (h === d) return { base: d };
+    if (h.endsWith("." + d)) return { base: d, sub: h.slice(0, -(d.length + 1)) };
+  }
+  return null;
+}
+
+// Caddy on-demand TLS ask: зөвхөн бодит preview subdomain / суурь домэйнд гэрчилгээ
+function isPreviewHost(host) {
+  const p = parsePreviewHost(host);
+  if (!p) return false;
+  if (!p.sub) return true; // суурь домэйн
+  return routes.has(p.sub); // зөвхөн бодит preview subdomain
 }
 
 // ── ♨️ Дулаан pool ────────────────────────────────────────────────────────
@@ -525,6 +545,8 @@ module.exports = {
   // subdomain routing (server.js proxy ашиглана)
   resolvePort,
   isPreviewHost,
-  PREVIEW_DOMAIN,
+  parsePreviewHost,
+  PRIMARY_DOMAIN,
+  PREVIEW_DOMAINS,
   DOMAIN_MODE,
 };
