@@ -43,6 +43,14 @@ export default function App() {
 | `ListItem` | `title`, `subtitle?`, `right?`, `onPress?` | Жагсаалтын мөр |
 | `Tabs` | `tabs`, `active`, `onChange` | Доод navigation. tabs=[{key,label,icon?}] |
 | `useTabs(initial)` | — | `{ active, setActive }` (navigation library хэрэггүй) |
+| `Chip` | `label`, `selected?`, `onPress?` | Сонгож болох таг (filter) |
+| `Switch` | `value`, `onValueChange` | Асаах/унтраах |
+| `Progress` | `value` (0..1), `tone?` | Явцын мөр |
+| `Spinner` | `size?`, `color?` | Ачаалж байна (ActivityIndicator) |
+| `Section` | `title?` | Гарчигтай бүлэг wrapper |
+| `IconButton` | `icon`, `onPress`, `size?` | Дугуй товч (emoji/icon) |
+| `EmptyState` | `icon?`, `title?`, `subtitle?`, `action?` | Хоосон төлөв |
+| `Modal` | `visible`, `onClose`, `title?` | Гарч ирэх цонх (backdrop дарахад хаагдана) |
 | `theme` | — | Өнгө/зай/radius токенууд (апп өөрчилж болно) |
 
 ## Theme токенууд

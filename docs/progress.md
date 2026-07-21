@@ -239,6 +239,13 @@ kit** (SAND, prebake) + **template-үүд** (builder апп, нөгөө аген
   NativeWind, Tamagui=өөрийн compiler) ихэнх нь Tailwind/NativeWind шаарддаг тул
   RN preview-д эрсдэлтэй (preview≠export). StyleSheet kit-ээр эхэлсэн нь найдвартай.
   Дараа нь Tamagui/NativeWind spike (батлаад л prebake).
+- ✅ **Kit баяжуулав (Өдөр 4 үргэлжлэл):** Chip, Switch, Progress, Spinner,
+  Section, IconButton, EmptyState, Modal нэмсэн (нийт 23+ export, kit ~64KB).
+  Локалд туршиж баталсан — бүгд зөв хөрвүүлэгдсэн, Vite логт алдаагүй.
+  Зааг тодруулсан: **kit = SAND (миний), template picker/сан = builder (нөгөө агент)**.
+- 💡 Build санамж: local-д cache reuse хийхэд mirror arg-тай build хий
+  (`--build-arg NPM_REGISTRY=https://registry.npmmirror.com`) — arg таарахгүй бол
+  npm install cache алдагдана. VPS дээр (хурдан сүлжээ) arg хэрэггүй.
 - ⬜ **VPS:** git pull → `docker build -t kodu-template-expo template-expo` → restart
 - ⬜ **App agent:** template picker UI + kit ашиглах (docs/component-kit.md өг)
 

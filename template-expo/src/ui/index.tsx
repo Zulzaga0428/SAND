@@ -14,6 +14,9 @@ import {
   Image,
   ScrollView,
   StyleSheet,
+  Modal as RNModal,
+  Switch as RNSwitch,
+  ActivityIndicator,
 } from "react-native";
 
 // ── Theme (design tokens) — апп өөрчилж болно ───────────────────────────────
@@ -222,6 +225,104 @@ export function useTabs(initial) {
   return { active, setActive };
 }
 
+// ── Chip (сонгож болох таг) ─────────────────────────────────────────────────
+export function Chip({ label, selected, onPress, style }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        s.chip,
+        selected && { backgroundColor: t.colors.primary, borderColor: t.colors.primary },
+        pressed && { opacity: 0.8 },
+        style,
+      ]}
+    >
+      <Text style={[s.chipText, selected && { color: t.colors.onPrimary }]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+// ── Switch (асаах/унтраах) ──────────────────────────────────────────────────
+export function Switch({ value, onValueChange }) {
+  return (
+    <RNSwitch
+      value={value}
+      onValueChange={onValueChange}
+      trackColor={{ false: t.colors.border, true: t.colors.primary }}
+      thumbColor="#fff"
+    />
+  );
+}
+
+// ── Progress (явцын мөр 0..1) ───────────────────────────────────────────────
+export function Progress({ value = 0, tone = "primary", style }) {
+  const pct = Math.max(0, Math.min(1, value)) * 100;
+  const color = t.colors[tone] || t.colors.primary;
+  return (
+    <View style={[s.progressTrack, style]}>
+      <View style={[s.progressFill, { width: `${pct}%`, backgroundColor: color }]} />
+    </View>
+  );
+}
+
+// ── Spinner (ачаалж байна) ──────────────────────────────────────────────────
+export function Spinner({ size = "large", color = t.colors.primary, style }) {
+  return <ActivityIndicator size={size} color={color} style={style} />;
+}
+
+// ── Section (гарчигтай бүлэг) ───────────────────────────────────────────────
+export function Section({ title, children, style }) {
+  return (
+    <View style={[{ marginTop: t.space.xl }, style]}>
+      {title ? <Text style={s.sectionTitle}>{title}</Text> : null}
+      {children}
+    </View>
+  );
+}
+
+// ── IconButton (дугуй товч, emoji/icon) ─────────────────────────────────────
+export function IconButton({ icon, onPress, size = 44, style }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        s.iconBtn,
+        { width: size, height: size, borderRadius: size / 2 },
+        pressed && { opacity: 0.7 },
+        style,
+      ]}
+    >
+      <Text style={{ fontSize: size * 0.42 }}>{icon}</Text>
+    </Pressable>
+  );
+}
+
+// ── EmptyState (хоосон төлөв) ───────────────────────────────────────────────
+export function EmptyState({ icon = "📭", title, subtitle, action }) {
+  return (
+    <View style={s.empty}>
+      <Text style={{ fontSize: 44 }}>{icon}</Text>
+      {title ? <Text style={[s.subtitle, { marginTop: t.space.md }]}>{title}</Text> : null}
+      {subtitle ? <Text style={[s.muted, { marginTop: 4, textAlign: "center" }]}>{subtitle}</Text> : null}
+      {action ? <View style={{ marginTop: t.space.lg }}>{action}</View> : null}
+    </View>
+  );
+}
+
+// ── Modal (гарч ирэх цонх) ──────────────────────────────────────────────────
+export function Modal({ visible, onClose, title, children }) {
+  return (
+    <RNModal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={s.backdrop} onPress={onClose}>
+        <Pressable style={s.modal} onPress={() => {}}>
+          {title ? <Text style={[s.subtitle, { marginBottom: t.space.md }]}>{title}</Text> : null}
+          {children}
+        </Pressable>
+      </Pressable>
+    </RNModal>
+  );
+}
+
 // ── Styles ────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: t.colors.bg },
@@ -279,4 +380,54 @@ const s = StyleSheet.create({
   },
   tab: { flex: 1, alignItems: "center", paddingVertical: t.space.md, gap: 2 },
   tabLabel: { color: t.colors.muted, fontSize: 12 },
+  chip: {
+    alignSelf: "flex-start",
+    borderWidth: 1,
+    borderColor: t.colors.border,
+    backgroundColor: t.colors.surface,
+    borderRadius: t.radius.pill,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+  },
+  chipText: { color: t.colors.text, fontSize: t.font.sm, fontWeight: "600" },
+  progressTrack: {
+    height: 8,
+    backgroundColor: t.colors.surfaceAlt,
+    borderRadius: t.radius.pill,
+    overflow: "hidden",
+  },
+  progressFill: { height: "100%", borderRadius: t.radius.pill },
+  sectionTitle: {
+    color: t.colors.muted,
+    fontSize: t.font.sm,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: t.space.sm,
+  },
+  iconBtn: {
+    backgroundColor: t.colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: t.colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  empty: { alignItems: "center", justifyContent: "center", padding: t.space.xxl },
+  backdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: t.space.xl,
+  },
+  modal: {
+    width: "100%",
+    maxWidth: 420,
+    backgroundColor: t.colors.surface,
+    borderColor: t.colors.border,
+    borderWidth: 1,
+    borderRadius: t.radius.lg,
+    padding: t.space.xl,
+    ...shadow,
+  },
 });
