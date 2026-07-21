@@ -246,6 +246,10 @@ kit** (SAND, prebake) + **template-үүд** (builder апп, нөгөө аген
 - 💡 Build санамж: local-д cache reuse хийхэд mirror arg-тай build хий
   (`--build-arg NPM_REGISTRY=https://registry.npmmirror.com`) — arg таарахгүй бол
   npm install cache алдагдана. VPS дээр (хурдан сүлжээ) arg хэрэггүй.
+- ✅ **Theme нэмэв (App agent хүсэлтээр — Б):** `ThemeProvider` нь **`{ base, accent }`**
+  авдаг. base=light/dark palette, accent=primary өнгө override. Бүх компонент
+  `useTheme()`-ээр theme-ийг дагадаг (makeStyles динамик). `useThemeToggle` товчоор
+  сэлгэнэ. Локалд туршсан: base=light+accent зөв хөрвүүлэгдсэн, алдаагүй (kit ~76KB).
 - ⬜ **VPS:** git pull → `docker build -t kodu-template-expo template-expo` → restart
 - ⬜ **App agent:** template picker UI + kit ашиглах (docs/component-kit.md өг)
 

@@ -4,24 +4,39 @@
 > install хийхгүйгээр `./ui`-аас import хийж ашиглана. Цэвэр `react-native`
 > StyleSheet тул **preview (Vite/RNW) болон export (Expo/Metro) хоёуланд ижил** ажиллана.
 
+## 🌙☀️ Theme — ThemeProvider (base + accent)
+
+Апп-аа `ThemeProvider`-оор ор. **`base`** = "light"|"dark", **`accent`** = primary
+өнгө (заавал биш). Provider-гүй бол default dark. Бүх компонент theme-ийг дагана.
+
+```tsx
+<ThemeProvider base="dark" accent="#ff5566">
+  ...app...
+</ThemeProvider>
+```
+
+Товчоор сэлгэх: `const { base, toggle } = useThemeToggle("dark")` → `<ThemeProvider base={base} ...>` + `<IconButton icon="🌙" onPress={toggle} />`.
+
 ## Хэрэглээ
 
 ```tsx
-import { Screen, Header, Title, Body, Button, Card, Badge, Tabs, useTabs } from "./ui";
+import { ThemeProvider, Screen, Header, Title, Body, Button, Card, Badge, Tabs, useTabs } from "./ui";
 
 export default function App() {
   const { active, setActive } = useTabs("home");
   return (
-    <Screen padded={false}>
-      <Header title="Миний апп" right={<Badge label="pro" tone="success" />} />
-      <Screen scroll>
-        <Title>Сайн уу</Title>
-        <Card><Body>Агуулга</Body></Card>
-        <Button title="Дарах" onPress={() => {}} />
+    <ThemeProvider base="dark" accent="#6d5efc">
+      <Screen padded={false}>
+        <Header title="Миний апп" right={<Badge label="pro" tone="success" />} />
+        <Screen scroll>
+          <Title>Сайн уу</Title>
+          <Card><Body>Агуулга</Body></Card>
+          <Button title="Дарах" onPress={() => {}} />
+        </Screen>
+        <Tabs active={active} onChange={setActive}
+          tabs={[{ key:"home", label:"Нүүр", icon:"🏠" }, { key:"cart", label:"Сагс", icon:"🛒" }]} />
       </Screen>
-      <Tabs active={active} onChange={setActive}
-        tabs={[{ key:"home", label:"Нүүр", icon:"🏠" }, { key:"cart", label:"Сагс", icon:"🛒" }]} />
-    </Screen>
+    </ThemeProvider>
   );
 }
 ```
@@ -30,6 +45,9 @@ export default function App() {
 
 | Компонент | Props | Тайлбар |
 |-----------|-------|---------|
+| `ThemeProvider` | `base`("light"\|"dark"), `accent?`, `children` | Theme-ийг тохируулна. Апп-аа үүгээр ор |
+| `useThemeToggle(initial?)` | — | `{ base, setBase, toggle }` — dark/light сэлгэх |
+| `useTheme()` | — | Одоогийн theme (`colors`, `space`, `radius`, `font`) |
 | `Screen` | `scroll?`, `padded?`, `style` | Дэлгэцийн container (bg + padding). `scroll` — гүйдэг |
 | `Header` | `title`, `right?` | Дээд самбар |
 | `Title` / `Subtitle` / `Body` / `Muted` | `style` | Текстийн хэв маягууд |
