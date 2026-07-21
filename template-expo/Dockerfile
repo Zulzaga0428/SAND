@@ -6,8 +6,10 @@ WORKDIR /home/node/app
 ARG NPM_REGISTRY=https://registry.npmjs.org
 
 # node_modules-ийг УРЬДЧИЛАН суулгана — preview болгонд npm install хийхгүй.
+# --legacy-peer-deps: react-native-svg зэрэг нь "react-native" (жинхэнэ) багцыг
+# peer гэж шаарддаг ч бид react-native-web ашигладаг тул peer зөрчлийг үл тоомсорлоно.
 COPY package.json ./
-RUN npm install --no-audit --no-fund \
+RUN npm install --no-audit --no-fund --legacy-peer-deps \
       --registry=$NPM_REGISTRY \
       --fetch-timeout=600000 \
       --fetch-retries=5 \
