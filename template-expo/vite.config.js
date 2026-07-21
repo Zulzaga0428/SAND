@@ -18,6 +18,8 @@ export default defineConfig({
     strictPort: true,
     // Sandbox proxy нь Host-ыг 127.0.0.1 болгож дамжуулдаг (changeOrigin) тул
     // vite-ийн host-шалгалт саад болохгүй. HMR нь HTTPS (Caddy, 443)-аар холбогдоно.
-    hmr: { clientPort: 443, protocol: "wss" },
+    // overlay: false — Vite dev алдааны улаан overlay-г хэрэглэгчид ХАРУУЛАХГҮЙ
+    // (preview дээр бүтээгдэхүүн эвдэрсэн мэт харагдахаас сэргийлнэ).
+    hmr: { clientPort: 443, protocol: "wss", overlay: false },
   },
 });
