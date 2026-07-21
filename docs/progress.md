@@ -156,6 +156,19 @@
 
 **Одоогийн байдал: sandbox КoDu-тай холбоход БЭЛЭН, хамгаалалт бат.**
 
+## ✅ Runtime: react-native-svg (icon-д) — VPS дээр батлагдсан
+
+- App agent-ийн хүсэлт: icon (emoji биш мэргэжлийн). Kit тэднийх тул runtime dep
+  л надаас хэрэгтэй байсан (нэг удаагийн SAND тусламж).
+- ✅ `react-native-svg` runtime-д нэмсэн (`@expo/vector-icons` биш — svg нь
+  Vite/RNW + Expo хоёуланд найдвартай, preview=export)
+- ✅ Dockerfile `--legacy-peer-deps` (react-native-svg нь react-native-ийг peer
+  шаарддаг ч бид react-native-web ашигладаг → ERESOLVE зассан)
+- ✅ **VPS дээр батлагдсан** (`client/verify-svg.js` → controller руу шууд Host
+  header-ээр, HTTPS loopback тойрч): react-native-svg Vite web-д alias-гүй зөв
+  хөрвүүлж байна
+- Дараа: App agent SVG-ээр Icon component бичиж, kit-даа нэмнэ (SAND rebuild хэрэггүй)
+
 ## ✅ Домэйн шилжилт — prw.kodu.live (жинхэнэ домэйн)
 
 - ✅ Жинхэнэ домэйн `prw.kodu.live` авсан (Namecheap DNS: prw + *.prw → VPS IP)
