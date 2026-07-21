@@ -221,6 +221,29 @@ App agent-ийн нарийн хүсэлт + туршсан жороор:
 
 ---
 
+## ✅ Өдөр 4 — 🎨 Component kit (template-үүдийн суурь)
+
+Стратеги: builder-үүдэд template нэмэх (жинхэнэ үсрэлт). 2 давхарга — **component
+kit** (SAND, prebake) + **template-үүд** (builder апп, нөгөө агент). Эхлээд kit.
+
+- ✅ **`template-expo/src/ui/index.tsx`** — цэвэр StyleSheet component kit:
+  Screen, Header, Title/Subtitle/Body/Muted, Button (4 variant), Card, Input,
+  Badge (5 tone), Avatar, Row, Divider, ListItem, Tabs, useTabs, theme токенууд.
+  Зөвхөн `react-native` → **preview=export баталгаатай**, build-tool-оос хамааралгүй.
+- ✅ **Prebake** — image-д шатаасан, апп `./ui`-аас import хийнэ (install хэрэггүй).
+- ✅ **Локалд туршиж баталсан:** олон компонент ашигласан апп → App.tsx + ui/index.tsx
+  зөв хөрвүүлэгдсэн (RNW), Vite логт алдаа алга.
+- ✅ **`docs/component-kit.md`** — App agent-ийн AI-д зориулсан бүрэн лавлах
+  (компонент, props, AI prompt зөвлөмж, export-д ui/ дагуулах анхааруулга).
+- 💡 Шийдвэр: popular library-ууд (shadcn=web/Tailwind, RN Reusables/Gluestack=
+  NativeWind, Tamagui=өөрийн compiler) ихэнх нь Tailwind/NativeWind шаарддаг тул
+  RN preview-д эрсдэлтэй (preview≠export). StyleSheet kit-ээр эхэлсэн нь найдвартай.
+  Дараа нь Tamagui/NativeWind spike (батлаад л prebake).
+- ⬜ **VPS:** git pull → `docker build -t kodu-template-expo template-expo` → restart
+- ⬜ **App agent:** template picker UI + kit ашиглах (docs/component-kit.md өг)
+
+---
+
 ## ✅ Өдөр 3 — ⏱️ Уян хатан TTL + keepalive (2026-07-18)
 
 > Асуулт: "sandbox 15 минутаас урт амьдрахгүй юу?" → Уян хатан болголоо.

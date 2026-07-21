@@ -1,22 +1,47 @@
-// Анхны placeholder — хэрэглэгчийн App.tsx үүнийг дарж бичнэ (src/App.tsx).
-import { View, Text, StyleSheet } from "react-native";
+// Анхны демо — хэрэглэгчийн App.tsx үүнийг дарж бичнэ.
+// Component kit-ийн жишээ (./ui-аас import).
+import {
+  Screen,
+  Header,
+  Title,
+  Body,
+  Muted,
+  Button,
+  Card,
+  Badge,
+  Row,
+  Tabs,
+  useTabs,
+} from "./ui";
 
 export default function App() {
+  const { active, setActive } = useTabs("home");
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Kodu Expo template 🐳</Text>
-      <Text style={styles.sub}>Хэрэглэгчийн App.tsx үүнийг дарж бичнэ.</Text>
-    </View>
+    <Screen padded={false}>
+      <Header title="Kodu App Kit 🐳" right={<Badge label="demo" tone="success" />} />
+      <Screen scroll>
+        <Title>Сайн уу!</Title>
+        <Muted>Component kit prebake хийгдсэн — import хийгээд шууд ашиглана.</Muted>
+
+        <Card style={{ marginTop: 16 }}>
+          <Row justify="space-between">
+            <Body>Бууз</Body>
+            <Badge label="₮12,000" />
+          </Row>
+        </Card>
+
+        <Button title="Захиалах" onPress={() => {}} style={{ marginTop: 16 }} />
+        <Button title="Цэс үзэх" variant="secondary" onPress={() => {}} style={{ marginTop: 8 }} />
+      </Screen>
+      <Tabs
+        active={active}
+        onChange={setActive}
+        tabs={[
+          { key: "home", label: "Нүүр", icon: "🏠" },
+          { key: "menu", label: "Цэс", icon: "🍽️" },
+          { key: "cart", label: "Сагс", icon: "🛒" },
+        ]}
+      />
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#0b1020",
-  },
-  title: { color: "#8fb0ff", fontSize: 22, fontWeight: "700" },
-  sub: { color: "#8b93a7", marginTop: 8 },
-});
