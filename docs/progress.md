@@ -156,6 +156,18 @@
 
 **Одоогийн байдал: sandbox КoDu-тай холбоход БЭЛЭН, хамгаалалт бат.**
 
+## ✅ Домэйн шилжилт — prw.kodu.live (жинхэнэ домэйн)
+
+- ✅ Жинхэнэ домэйн `prw.kodu.live` авсан (Namecheap DNS: prw + *.prw → VPS IP)
+- ✅ Controller олон домэйн дэмждэг (PREVIEW_DOMAIN таслалаар, эхнийх=PRIMARY)
+- ✅ `bash deploy/https.sh prw.kodu.live prw.hisainuu.online` — хоёул зэрэг амьд
+  (kodu.live=PRIMARY, hisainuu зэрэг → шилжилтэд preview тасрахгүй)
+- ✅ Баталсан: `https://prw.kodu.live/` + `https://prw.hisainuu.online/` → 200
+- Дараа: App agent `KODU_SANDBOX_URL` → https://prw.kodu.live болгоно → тестэлнэ
+  → жигд бол hisainuu унтраана (`https.sh prw.kodu.live` ганцаар)
+- Тэмдэглэл: app.kodu.live-д Preview 1=SAND, Preview 2=Vercel fallback. SAND унавал
+  (жишээ kodu.live HTTPS амжаагүй үед) Vercel руу шилждэг.
+
 ---
 
 ## ✅ Өдөр 3 — ⏱️ Уян TTL/keepalive + 🌐 HTTPS subdomain routing (M3)
