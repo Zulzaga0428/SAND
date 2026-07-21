@@ -1,11 +1,12 @@
 // client/verify-svg.js — react-native-svg runtime-д ажиллаж байгааг батлах.
-// SVG ашигласан expo апп үүсгэж, Vite react-native-svg-ийг web-д зөв
-// хөрвүүлж байгааг шалгана (resolve алдаа байвал илрүүлнэ).
-// Ажиллуулах (сервер дээр, /opt/kodu-sandbox дотор):
+// Controller руу ШУУД (HTTPS-гүй, Host header-ээр) шалгана — тэгэхээр
+// гэрчилгээ/loopback асуудалгүй. App.tsx (react-native-svg-тэй) Vite web-д
+// зөв хөрвүүлж байгааг илрүүлнэ.
 //   node client/verify-svg.js
 
 const fs = require("fs");
 const path = require("path");
+const http = require("http");
 const { KoduSandbox } = require("./index");
 
 const baseUrl = process.env.SAND_URL || "http://localhost:4000";
@@ -36,27 +37,51 @@ export default function App() {
 }
 `;
 
-const ERR_MARKERS = ["Failed to resolve", "does not provide an export", "Internal Server Error", "Pre-transform error", "[plugin:"];
+const ERR_MARKERS = ["Failed to resolve", "does not provide an export", "Internal Server Error", "Pre-transform error", "[plugin:", "Cannot find"];
+
+// Controller-ийн HTTP порт руу ШУУД (Host header-ээр preview subdomain руу чиглүүлнэ)
+function fetchViaProxy(host, pathname) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(baseUrl);
+    const req = http.request(
+      { host: u.hostname, port: u.port || 80, path: pathname, method: "GET", headers: { Host: host }, timeout: 20000 },
+      (res) => {
+        let body = "";
+        res.on("data", (c) => (body += c));
+        res.on("end", () => resolve({ status: res.statusCode, body }));
+      }
+    );
+    req.on("error", reject);
+    req.on("timeout", () => { req.destroy(); reject(new Error("timeout")); });
+    req.end();
+  });
+}
 
 (async () => {
   console.log("\n🧪 react-native-svg шалгаж байна... (Vite асахад хэдэн секунд)\n");
   const sb = new KoduSandbox({ baseUrl, apiKey });
   let id;
   try {
-    const r = await sb.createAndWait([{ path: "src/App.tsx", content: APP }], { mode: "expo" });
+    // createPreview expo горимд дотоод readiness хүлээгээд буцна (HTTPS хүлээхгүй)
+    const r = await sb.createPreview([{ path: "src/App.tsx", content: APP }], { mode: "expo" });
     id = r.id;
-    console.log("  preview:", r.url, `(${r.readyMs}ms)`);
+    console.log("  preview:", r.url);
 
-    // App.tsx-ийг татаж, Vite react-native-svg-ийг хөрвүүлж чадаж байгааг шалга
-    let ok = true;
-    let detail = "";
-    try {
-      const res = await fetch(r.url.replace(/\/$/, "") + "/src/App.tsx", { signal: AbortSignal.timeout(15000) });
-      const text = await res.text();
-      if (res.status >= 400) { ok = false; detail = "HTTP " + res.status; }
-      for (const m of ERR_MARKERS) if (text.includes(m)) { ok = false; detail = m; }
-    } catch (e) {
-      ok = false; detail = e.message;
+    // https://<sub>.<domain> → sub + host гаргаж авна
+    const m = r.url.match(/^https?:\/\/([^.]+)\.(.+?)\/?$/);
+    if (!m) throw new Error("URL-аас subdomain гаргаж чадсангүй: " + r.url);
+    const hostHeader = m[1] + "." + m[2];
+
+    // App.tsx-ийг controller proxy-гоор татаж, Vite react-native-svg хөрвүүлж
+    // байгааг шалга (Vite эхний удаад compile хийхэд хэдэн секунд авна — 2 оролдоно)
+    let ok = false, detail = "тодорхойгүй";
+    for (let i = 0; i < 8; i++) {
+      try {
+        const res = await fetchViaProxy(hostHeader, "/src/App.tsx");
+        if (res.status === 200 && !ERR_MARKERS.some((x) => res.body.includes(x))) { ok = true; break; }
+        detail = "HTTP " + res.status + (ERR_MARKERS.find((x) => res.body.includes(x)) || "");
+      } catch (e) { detail = e.message; }
+      await new Promise((r) => setTimeout(r, 1500));
     }
 
     if (ok) {
