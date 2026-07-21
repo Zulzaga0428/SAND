@@ -1,8 +1,12 @@
-# 🎨 Kodu App Component Kit — БҮРЭН лавлах (app.kodu.live AI-д зориулсан)
+# 🎨 Kodu App Component Kit — лавлах (app.kodu.live-д зориулсан)
 
-> Expo/react-native-web template-д **prebake** хийгдсэн. Апп-ууд install хийхгүйгээр
-> `./ui`-аас import хийнэ. Цэвэр `react-native` StyleSheet тул **preview (Vite/RNW)
-> болон export (Expo/Metro) хоёуланд ижил** ажиллана.
+> ⚠️ **ЭЗЭМШИЛ ӨӨРЧЛӨГДСӨН (2026-07):** Энэ kit-ийг одоо **app.kodu.live эзэмшдэг**
+> — SAND дотор prebake хийгддэггүй. Апп-ууд `src/ui/*`-ыг өөрсдийн `files`-д хамт
+> илгээдэг. SAND зөвхөн **runtime** (react-native-web + vite + alias + Alert
+> polyfill) prebake хийнэ. Доорх нь **лавлах** (kit-ийн анхны эх код + props).
+>
+> Апп-ууд `./ui`-аас import хийнэ. Цэвэр `react-native` StyleSheet тул **preview
+> (Vite/RNW) болон export (Expo/Metro) хоёуланд ижил** ажиллана.
 >
 > ⚠️ **Зөвхөн доор жагссан props-ыг** ашигла. Байхгүй prop бичвэл (жишээ Button-д
 > `loading`, Input-д `label`) — үл тоомсорлогдоно, гэхдээ битгий найд.

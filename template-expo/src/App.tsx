@@ -1,54 +1,26 @@
-// Анхны демо — хэрэглэгчийн App.tsx үүнийг дарж бичнэ.
-// ThemeProvider (base + accent) + theme toggle жишээ.
-import {
-  ThemeProvider,
-  useThemeToggle,
-  Screen,
-  Header,
-  Title,
-  Body,
-  Muted,
-  Button,
-  Card,
-  Badge,
-  Row,
-  IconButton,
-  Tabs,
-  useTabs,
-} from "./ui";
+// Анхны placeholder — хэрэглэгчийн App.tsx үүнийг дарж бичнэ.
+// ⚠️ Component kit (ui/) SAND-д prebake хийгддэггүй — apps өөрсдийн ui/-г
+// илгээдэг (app.kodu.live эзэмшдэг). SAND зөвхөн runtime (react-native-web +
+// vite + alias + Alert polyfill) prebake хийнэ. Тиймээс энэ demo нь цэвэр
+// react-native — ./ui-аас import ХИЙХГҮЙ.
+import { View, Text, StyleSheet } from "react-native";
 
 export default function App() {
-  const { base, toggle } = useThemeToggle("dark");
   return (
-    <ThemeProvider base={base} accent="#6d5efc">
-      <Screen padded={false}>
-        <Header
-          title="Kodu App Kit 🐳"
-          right={<IconButton icon={base === "dark" ? "🌙" : "☀️"} onPress={toggle} size={38} />}
-        />
-        <Screen scroll>
-          <Title>Сайн уу!</Title>
-          <Muted>ThemeProvider: base + accent. Дээд товчоор dark/light сэлгэнэ.</Muted>
-
-          <Card style={{ marginTop: 16 }}>
-            <Row justify="space-between">
-              <Body>Бууз</Body>
-              <Badge label="₮12,000" />
-            </Row>
-          </Card>
-
-          <Button title="Захиалах" onPress={() => {}} style={{ marginTop: 16 }} />
-          <Button title="Цэс үзэх" variant="secondary" onPress={() => {}} style={{ marginTop: 8 }} />
-        </Screen>
-        <Tabs
-          active={useTabs("home").active}
-          onChange={() => {}}
-          tabs={[
-            { key: "home", label: "Нүүр", icon: "🏠" },
-            { key: "menu", label: "Цэс", icon: "🍽️" },
-          ]}
-        />
-      </Screen>
-    </ThemeProvider>
+    <View style={styles.container}>
+      <Text style={styles.title}>Kodu Sandbox runtime 🐳</Text>
+      <Text style={styles.sub}>react-native-web + vite бэлэн.</Text>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#0b1020",
+  },
+  title: { color: "#8fb0ff", fontSize: 22, fontWeight: "700" },
+  sub: { color: "#8b93a7", marginTop: 8 },
+});

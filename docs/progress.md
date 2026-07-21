@@ -265,6 +265,23 @@ kit** (SAND, prebake) + **template-үүд** (builder апп, нөгөө аген
 - ⬜ **VPS:** git pull → `docker build -t kodu-template-expo template-expo` → restart
 - ⬜ **App agent:** template picker UI + kit ашиглах (docs/component-kit.md өг)
 
+## ✅ Kit-ийг App agent-д шилжүүлэв — SAND = цэвэр runtime (2026-07)
+
+Зарчим (хэрэглэгчийн зөв дүгнэлт): **SAND = E2B шиг тэнэг runtime**, контент
+(kit, template) = App agent эзэмшинэ. Web+E2B загвар: agent код авчирна, sandbox
+ажиллуулна.
+
+- ✅ App agent kit-ээ аваад, апп бүрт `src/ui/*` илгээж эхэлсэн (тогтвортой)
+- ✅ SAND template-ээс `src/ui/` **хассан**. Default `App.tsx` → standalone
+  (./ui-гүй). SAND зөвхөн runtime prebake: react-native-web, vite, alias,
+  Alert polyfill (main.jsx), index.html
+- ✅ Локалд туршиж баталсан:
+  - Апп өөрийн ui/ илгээх (App agent урсгал) → ажиллана ✅
+  - Default template (файлгүй, standalone) → ажиллана ✅
+- ⬜ **VPS:** git pull → docker build expo → restart → App agent-д дохио
+- 🎯 Ингэснээр SAND чөлөөлөгдөж, engine-ийн сайжруулалт (Expo warm pool,
+  scale, web шилжүүлэх) руу орох боломжтой боллоо
+
 ---
 
 ## ✅ Өдөр 3 — ⏱️ Уян хатан TTL + keepalive (2026-07-18)
