@@ -85,6 +85,16 @@ function previewTarget(req) {
 const app = express();
 app.set("trust proxy", 1);
 
+// 🔒 Scanner/bot-ууд public preview-д секрет хайж /.env, /.env.example, /.git,
+// /.aws гэх мэт хандана. Эдгээрийг Vite dev server-т ХҮРГЭЛГҮЙ шууд 404 буцаана
+// (эс бол Vite readFile → ENOENT → бүх хэрэглэгчид улаан overlay гарна).
+// Root-level dotfile (/. -ээр эхэлсэн) л хаана — Vite-ийн /src, /@vite,
+// /node_modules/.vite зэрэг хэвийн хүсэлт /. -ээр эхэлдэггүй тул саад болохгүй.
+function isSensitivePath(url) {
+  const p = (url || "").split("?")[0];
+  return /^\/\.[^/]/.test(p) || /\/\.env(\.|\/|$)/i.test(p);
+}
+
 // ⚠️ Proxy нь body-parser-аас ӨМНӨ ажиллана — preview рүү явах хүсэлтийн
 // биеийг controller уншиж авахгүй (POST/upload шууд preview-д хүрнэ).
 app.use((req, res, next) => {
@@ -92,6 +102,11 @@ app.use((req, res, next) => {
   if (target === null) return next(); // dashboard/API
   if (target === "notfound") {
     res.status(404).send("Preview олдсонгүй эсвэл дууссан байна.");
+    return;
+  }
+  // 🔒 Эмзэг dotfile хүсэлтийг Vite-д хүргэлгүй шууд 404 (scanner overlay-г таслана)
+  if (isSensitivePath(req.url)) {
+    res.status(404).end();
     return;
   }
   // agent:false — холболт бүрийг шинээр (keep-alive quirk-ээс сэргийлнэ)
